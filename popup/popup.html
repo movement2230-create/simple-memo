@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메모장</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <input id="search" type="search" placeholder="메모 검색" aria-label="메모 검색" autocomplete="off">
+      <button id="new-note" class="icon-btn primary" title="새 메모 (Alt+N)" aria-label="새 메모">＋</button>
+    </div>
+    <ul id="note-list" class="note-list" aria-label="메모 목록"></ul>
+    <p id="empty-list" class="empty" hidden>메모가 없습니다</p>
+  </aside>
+
+  <main class="editor">
+    <div class="toolbar">
+      <span id="status" class="status" aria-live="polite"></span>
+      <div class="actions">
+        <button id="export" class="text-btn" title="이 메모를 .txt 파일로 저장">내보내기</button>
+        <button id="open-tab" class="text-btn" title="새 탭에서 크게 열기">크게 보기</button>
+        <button id="delete" class="text-btn danger" title="이 메모 삭제">삭제</button>
+      </div>
+    </div>
+    <textarea id="content" placeholder="여기에 메모를 입력하세요.&#10;첫 줄이 메모 제목이 됩니다." spellcheck="false" aria-label="메모 내용"></textarea>
+    <div class="footer">
+      <span id="count">0자</span>
+      <span id="updated"></span>
+    </div>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>
