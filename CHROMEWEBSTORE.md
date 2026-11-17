@@ -166,7 +166,7 @@ No, I am not using remote code.
 ## 5. 개인정보처리방침
 
 - 원문: `docs/privacy-policy.html` (한국어·영어 병기). `docs/` 폴더가 GitHub Pages로 공개됩니다.
-- **공개 URL:** ⬜ GitHub Pages 공개 후 기록
+- **공개 URL:** https://movement2230-create.github.io/simple-memo/privacy-policy.html
 - 데이터를 수집하지 않는 경우 필수는 아니지만, 대시보드 입력란이 있고 심사 지연을 막아 주므로 등록을 권장합니다.
 - 내용을 고치면 `main` 브랜치에 푸시하면 1~2분 뒤 같은 주소에 반영됩니다. 시행일도 함께 고칩니다.
 
@@ -187,7 +187,7 @@ No, I am not using remote code.
 | 게시자 이름 [필수] | 에릭 | ✅ |
 | 연락 이메일 [필수, 스토어에 공개됨] | movement2230@gmail.com | ✅ |
 | 지원 URL 또는 이메일 [권장] | movement2230@gmail.com | ✅ |
-| 홈페이지 URL [권장] | (GitHub 저장소 공개 후 기록) | ⬜ |
+| 홈페이지 URL [권장] | https://github.com/movement2230-create/simple-memo | ✅ |
 
 > 개발자 계정 등록 시 1회 등록비(US$5)가 있고, 계정의 이메일 인증이 필요합니다.
 > 연락 이메일이 바뀌면 자세한 설명의 "문의" 문단과 `docs/privacy-policy.html`의 연락처도 함께 고칩니다.
