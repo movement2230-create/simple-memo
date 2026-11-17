@@ -200,7 +200,8 @@ No, I am not using remote code.
 python scripts/package.py
 ```
 
-- 결과물: `dist/simple-memo-v<버전>.zip` (현재 `dist/simple-memo-v1.0.0.zip`, 13.4KB, 파일 7개)
+- 결과물: `dist/simple-memo-v<버전>.zip` (현재 `dist/simple-memo-v1.0.0.zip`, 13.8KB, 파일 7개)
+- 업로드 전에 `node scripts/chrome-test.mjs`로 실제 Chrome 점검을 먼저 돌립니다. "모두 통과"가 나와야 합니다.
 - 스크립트가 함께 확인하는 것: `manifest_version` 3, 설명 132자 이내, 아이콘 파일 존재, 압축 경로 구분자 `/`
 - 포함: `manifest.json`, `icons/`, `popup/` (실행에 필요한 파일만 허용 목록 방식으로 담음)
 - 제외: `CHROMEWEBSTORE.md`, `store-assets/`, `scripts/`, `.claude/`, `dist/` 등 개발용 파일
@@ -212,7 +213,7 @@ python scripts/package.py
 
 | 버전 | 날짜 | 변경 사항 | 상태 |
 |------|------|----------|------|
-| 1.0.0 | 2026-11-17 | 첫 출시: 여러 메모, 자동 저장, 검색, .txt 내보내기, 크게 보기, 다크 모드 | 초안 (제출 전) |
+| 1.0.0 | 2026-11-17 | 첫 출시: 여러 메모, 자동 저장, 검색, .txt 내보내기, 크게 보기, 다크 모드. (제출 전 수정: 같은 메모를 여러 탭에 열어 둔 경우 뒤쪽 탭이 옛 내용으로 덮어쓰던 문제 해결) | 초안 (제출 전) |
 
 상태: 초안 · 제출됨 · 심사 중 · 게시됨 · 거부됨
 
@@ -229,7 +230,7 @@ python scripts/package.py
 - [x] 원격 코드, `eval()`, 난독화 없음
 - [x] 128×128 아이콘, 1280×800 스크린샷 3장, 440×280 프로모션 타일
 - [x] 개발용 파일을 뺀 ZIP 생성
-- [ ] 압축 해제된 확장 프로그램으로 Chrome에 직접 로드해 팝업·크게 보기·내보내기 확인, 콘솔 오류 없음 확인
+- [x] 실제 Chrome(157)에 로드해 기능 점검 27개 항목 통과, 콘솔 오류 없음 — `node scripts/chrome-test.mjs` (2026-11-17)
 - [ ] 개인정보처리방침 공개 URL 등록 및 접속 확인
 - [x] 게시자 이름·연락 이메일 정함 (에릭 / movement2230@gmail.com)
 

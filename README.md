@@ -35,7 +35,16 @@
 | `docs/` | GitHub Pages로 공개되는 개인정보처리방침 |
 | `store-assets/` | 스토어 스크린샷·프로모션 이미지와 생성 스크립트 |
 | `scripts/package.py` | 스토어 업로드용 ZIP 생성 |
+| `scripts/chrome-test.mjs` | 실제 Chrome에 확장 프로그램을 올려 기능 점검 |
 | `CHROMEWEBSTORE.md` | 스토어 등록 정보, 권한 사유, 버전 기록 |
+
+## 테스트
+
+```bash
+node scripts/chrome-test.mjs
+```
+
+설치된 Chrome을 임시 프로필로 창 없이 띄워 확장 프로그램을 로드하고 입력·자동 저장·검색·삭제·내보내기·크게 보기·탭 간 동기화를 점검합니다. 평소 쓰는 Chrome 프로필은 건드리지 않습니다. 결과는 `test-results/`에 저장됩니다.
 
 ## 스토어 업로드 파일 만들기
 

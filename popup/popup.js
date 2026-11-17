@@ -111,8 +111,12 @@ function renderEditor() {
   els.content.disabled = disabled;
   els.del.disabled = disabled;
   els.exportBtn.disabled = disabled;
-  if (els.content.value !== (note?.content ?? '')) {
-    els.content.value = note?.content ?? '';
+  const next = note?.content ?? '';
+  if (els.content.value !== next) {
+    // 다른 창에서 바뀐 내용을 반영할 때 커서 위치는 최대한 유지
+    const { selectionStart, selectionEnd } = els.content;
+    els.content.value = next;
+    els.content.setSelectionRange(Math.min(selectionStart, next.length), Math.min(selectionEnd, next.length));
   }
   renderFooter();
   resetDeleteButton();
@@ -273,7 +277,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// 팝업과 탭을 동시에 열어 둔 경우 다른 쪽 변경 사항 반영
+// 같은 메모를 여러 곳(팝업, 크게 보기 탭 여러 개)에 열어 둔 경우 다른 쪽 변경 사항 반영.
+// 지금 이 창에서 입력 중일 때만 편집 영역을 건드리지 않고, 나머지 경우에는 바로 갱신해
+// 뒤에 남아 있던 창에서 옛 내용으로 덮어쓰는 일이 없게 한다.
+const typingHere = () => document.hasFocus() && document.activeElement === els.content;
+
 if (hasChromeStorage) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.notes) return;
@@ -282,7 +290,17 @@ if (hasChromeStorage) {
     notes = incoming;
     if (!activeNote()) activeId = notes[0]?.id ?? null;
     renderList();
-    if (document.activeElement !== els.content) renderEditor();
+    if (!typingHere()) renderEditor();
+  });
+
+  // 입력 중에 다른 창에서 바뀐 경우를 대비해, 이 창으로 돌아올 때 최신 내용으로 맞춤
+  window.addEventListener('focus', async () => {
+    const { notes: latest = [] } = await chrome.storage.local.get('notes');
+    if (JSON.stringify(latest) === JSON.stringify(notes)) return;
+    notes = latest;
+    if (!activeNote()) activeId = notes[0]?.id ?? null;
+    renderList();
+    renderEditor();
   });
 }
 

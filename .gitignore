@@ -10,3 +10,6 @@ Thumbs.db
 desktop.ini
 __pycache__/
 *.pyc
+
+# 실제 Chrome 테스트 결과 (node scripts/chrome-test.mjs)
+test-results/
