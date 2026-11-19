@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "메일 할 일",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "메일 목록의 제목만 읽어 할 일과 마감일을 자동으로 만들고 달력에 보여 줍니다. 모든 처리는 이 PC 안에서만 이뤄집니다.",
   "minimum_chrome_version": "120",
   "permissions": ["storage", "activeTab", "scripting"],
