@@ -199,3 +199,25 @@ dialog input[type="text"], dialog textarea { width: 100%; font-weight: 400; }
   .rules { grid-template-columns: 1fr; }
   .day { min-height: 80px; }
 }
+
+/* ---------- 메일함 구분 ---------- */
+.mb-bar[hidden] { display: none; }
+.mb-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
+.mb-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.mb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 12px 4px 10px;
+}
+.mb-toggle[aria-pressed="false"] { opacity: .45; }
+.mb-toggle[aria-pressed="false"] span:not(.mb-dot) { text-decoration: line-through; }
+.mb-count { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mb-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.chip .mb-dot { margin-top: 5px; }
+.mb-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.site-list li { gap: 10px; justify-content: flex-start; }
+.site-list li .host { flex: 1; font-size: 12px; }
+.site-list input[type="color"] { width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
+.site-list .mb-name { width: 140px; }

@@ -1,4 +1,5 @@
 import { sitePattern, ymd } from '../src/rules.js';
+import { mailboxOf } from '../src/mailboxes.js';
 
 const $ = (id) => document.getElementById(id);
 const send = (msg) => chrome.runtime.sendMessage(msg);
@@ -20,14 +21,33 @@ async function renderSite() {
     $('siteState').hidden = true;
     $('siteHelp').textContent = '사내 메일, Gmail, Outlook 같은 메일함을 연 상태에서 아이콘을 눌러 주세요.';
     $('toggleSite').hidden = true;
+    $('siteDot').hidden = true;
+    $('mbNameRow').hidden = true;
     return;
   }
   host = url.hostname;
-  const { sites = [] } = await chrome.storage.local.get('sites');
+  const { sites = [], settings = {} } = await chrome.storage.local.get(['sites', 'settings']);
   const granted = await chrome.permissions.contains({ origins: [sitePattern(host)] });
   const on = granted && sites.includes(host);
+  const m = mailboxOf(host, settings.mailboxes);
 
-  $('siteName').textContent = host;
+  $('siteName').textContent = on ? `${m.name} · ${host}` : host;
+  $('siteName').title = host;
+  $('siteDot').hidden = !on;
+  $('siteDot').style.background = m.color;
+  $('mbNameRow').hidden = !on;
+  if (document.activeElement !== $('mbName')) $('mbName').value = m.name;
+  $('mbName').onchange = async () => {
+    const name = $('mbName').value.trim();
+    if (!name) { $('mbName').value = m.name; return; }
+    const { settings: cur = {} } = await chrome.storage.local.get('settings');
+    const mailboxes = { ...(cur.mailboxes || {}) };
+    const { key, ...base } = mailboxOf(host, mailboxes);
+    mailboxes[host] = { ...base, name };
+    await send({ type: 'settings:set', patch: { mailboxes } });
+    say(`메일함 이름을 "${name}"(으)로 바꿨어요.`);
+    renderSite();
+  };
   $('siteState').textContent = on ? '수집 중' : '꺼짐';
   $('siteState').classList.toggle('on', on);
   $('siteHelp').textContent = on
@@ -78,7 +98,7 @@ $('pickBtn').onclick = async () => {
 };
 
 async function renderDue() {
-  const { todos = [] } = await chrome.storage.local.get('todos');
+  const { todos = [], settings = {} } = await chrome.storage.local.get(['todos', 'settings']);
   const today = ymd(new Date());
   const due = todos
     .filter((t) => !t.done && t.due && t.due <= today)
@@ -108,11 +128,18 @@ async function renderDue() {
     const d = document.createElement('span');
     d.className = `d${t.due < today ? ' overdue' : ''}`;
     d.textContent = t.due < today ? `${t.due.slice(5).replace('-', '/')} 지남` : (t.dueTime || '오늘');
-    li.append(chk, title, d);
+    const m = mailboxOf(t.site, settings.mailboxes);
+    const mbEl = document.createElement('span');
+    mbEl.className = 'mb';
+    const dotEl = document.createElement('span');
+    dotEl.className = 'mb-dot';
+    dotEl.style.background = m.color;
+    mbEl.append(dotEl, m.name);
+    li.append(chk, title, mbEl, d);
     list.append(li);
   }
 }
 
-chrome.storage.onChanged.addListener((c, area) => { if (area === 'local' && c.todos) renderDue(); });
+chrome.storage.onChanged.addListener((c, area) => { if (area === 'local' && (c.todos || c.settings)) renderDue(); });
 renderSite();
 renderDue();

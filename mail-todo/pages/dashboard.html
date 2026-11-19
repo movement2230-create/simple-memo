@@ -20,6 +20,9 @@
   </header>
 
   <main>
+    <!-- 메일함별로 골라 보기 (달력·목록 공통) -->
+    <div id="mbBar" class="mb-bar" role="group" aria-label="메일함 골라 보기"></div>
+
     <!-- 달력 -->
     <section id="tab-calendar" class="tab">
       <div class="cal-layout">
@@ -63,7 +66,7 @@
       <div class="settings">
         <article class="card">
           <h3>할 일을 수집하는 메일함</h3>
-          <p class="muted">메일함 페이지에서 툴바의 확장 프로그램 아이콘을 누르고 <b>이 메일함에서 켜기</b>를 누르면 여기에 추가돼요.</p>
+          <p class="muted">메일함 페이지에서 툴바의 확장 프로그램 아이콘을 누르고 <b>이 메일함에서 켜기</b>를 누르면 여기에 추가돼요. 이름과 색을 바꾸면 달력과 목록에 그대로 표시돼요.</p>
           <ul id="siteList" class="site-list"></ul>
         </article>
 
@@ -122,6 +125,9 @@
             <option value="normal">보통</option>
             <option value="low">낮음</option>
           </select>
+        </label>
+        <label>메일함
+          <select id="fMailbox"></select>
         </label>
       </div>
       <label>메모<textarea id="fMemo" rows="4" maxlength="5000"></textarea></label>

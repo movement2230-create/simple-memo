@@ -39,3 +39,9 @@ section h2 { font-size: 13px; margin: 0 0 6px; }
 .chk:hover { border-color: var(--ok); }
 
 footer { padding: 8px 14px 0; font-size: 11px; }
+
+.mb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.mb-dot[hidden] { display: none; }
+.mb-name-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.mb-name-row input { flex: 1; padding: 4px 8px; }
+.due-list .mb { font-size: 11px; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }

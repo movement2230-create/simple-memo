@@ -30,7 +30,7 @@ const check = (name, ok, detail = '') => {
 const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'mail-todo-ext-'));
 for (const p of ['manifest.json', 'src', 'pages', 'icons']) fs.cpSync(path.join(ROOT, p), path.join(ext, p), { recursive: true });
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-manifest.host_permissions = ['*://127.0.0.1/*', '*://mail.google.com/*', '*://localhost/*'];
+manifest.host_permissions = ['*://127.0.0.1/*', '*://mail.google.com/*', '*://mail.naver.com/*', '*://localhost/*'];
 fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
 // ---------- 가짜 메일함 ----------
@@ -55,6 +55,13 @@ const GMAIL = `<!doctype html><meta charset="utf-8"><title>Gmail</title><table><
   ['Weekly newsletter #42', '18a2'],
   ['계약서 초안 회신 부탁드립니다', '18a3'],
 ].map(([s, id], i) => `<tr class="zA ${i ? 'yO' : 'zE'}"><td><span class="yP">Sender</span></td><td><div class="y6"><span class="bog"><span data-legacy-thread-id="${id}">${s}</span></span></div></td></tr>`).join('')}</tbody></table>`;
+
+// 네이버 메일형: 제목이 mail_title 안의 링크
+const NAVER = `<!doctype html><meta charset="utf-8"><title>네이버 메일</title><ol>${[
+  '[스마트스토어] 정산 서류 제출 요청 (11/27까지)',
+  '네이버페이 결제완료 안내',
+  '동창회 참석 여부 회신 부탁해',
+].map((s, i) => `<li class="mail_item"><div class="mail_sender">보낸이${i}</div><div class="mail_title"><a class="mail_title_link" href="#read/${i}"><span class="text">${s}</span></a></div></li>`).join('')}</ol>`;
 
 // 클래스 이름이 무작위라 자동으로는 못 찾는 메일함 → "목록 직접 지정" 필요
 const OBFUSCATED = `<!doctype html><meta charset="utf-8"><title>Web Mail</title><div role="listbox">${[
@@ -82,6 +89,7 @@ const ctx = await chromium.launchPersistentContext(profile, {
   deviceScaleFactor: 2,
 });
 await ctx.route('https://mail.google.com/**', (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body: GMAIL }));
+await ctx.route('https://mail.naver.com/**', (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body: NAVER }));
 
 let [sw] = ctx.serviceWorkers();
 if (!sw) sw = await ctx.waitForEvent('serviceworker');
@@ -103,7 +111,7 @@ const waitFor = async (fn, ms = 8000) => {
   return false;
 };
 
-for (const host of ['127.0.0.1', 'mail.google.com']) await bg({ type: 'site:enable', host });
+for (const host of ['127.0.0.1', 'mail.google.com', 'mail.naver.com']) await bg({ type: 'site:enable', host });
 
 // 1) 일반 그룹웨어형: class="subject" 자동 인식
 const gw = await ctx.newPage();
@@ -133,6 +141,14 @@ const gmTodos = todos.filter((t) => t.site === 'mail.google.com');
 check('Gmail형: 할 일 2개(뉴스레터 제외)', gmTodos.length === 2, gmTodos.map((t) => t.title).join(' | '));
 check('Gmail형: 스레드 링크', gmTodos.some((t) => t.link.endsWith('#all/18a1')));
 
+// 2-1) 네이버 메일형
+const nv = await ctx.newPage();
+await nv.goto('https://mail.naver.com/v2/folders/0/all');
+await waitFor(async () => (await getTodos()).filter((t) => t.site === 'mail.naver.com').length >= 2);
+const nvTodos = (await getTodos()).filter((t) => t.site === 'mail.naver.com');
+check('네이버형: 할 일 2개(결제완료 안내 제외)', nvTodos.length === 2, nvTodos.map((t) => `${t.title}(${t.due})`).join(' | '));
+check('네이버형: 보낸 사람은 안 읽음', !nvTodos.some((t) => t.title.includes('보낸이')));
+
 // 3) 알아보기 어려운 메일함: 자동으로 못 찾고, 직접 지정하면 찾음
 await bg({ type: 'site:enable', host: 'localhost' });
 const wm = await ctx.newPage();
@@ -149,6 +165,11 @@ check('직접 지정 후: 할 일 2개(동호회 안내 제외)', wmTodos.length
 check('직접 지정 후: 보낸 사람·시간은 안 읽음', !wmTodos.some((t) => /김철수|오전/.test(t.title)));
 await wm.screenshot({ path: path.join(OUT, '3-pick-result.png') });
 
+// 3-1) 메일함 이름·색 자동 지정
+const boxes = await dash.evaluate(async () => (await chrome.storage.local.get('settings')).settings?.mailboxes || {});
+check('메일함 이름: 구글/네이버 자동, 그 밖은 사내', boxes['mail.google.com']?.name === '구글' && boxes['mail.naver.com']?.name === '네이버' && boxes['127.0.0.1']?.name === '사내' && boxes.localhost?.name === '사내', JSON.stringify(Object.fromEntries(Object.entries(boxes).map(([k, v]) => [k, v.name]))));
+check('메일함 색: 사내 메일함 둘은 서로 다른 색', boxes['127.0.0.1']?.color !== boxes.localhost?.color);
+
 // 4) 달력
 await dash.bringToFront();
 await dash.reload();
@@ -157,6 +178,22 @@ await dash.screenshot({ path: path.join(OUT, '1-calendar.png'), fullPage: true }
 const chipsInGrid = await dash.locator('#calGrid .chip').count();
 const withDue = (await getTodos()).filter((t) => t.due && !t.done).length;
 check('달력: 마감일 있는 할 일이 모두 표시됨', chipsInGrid === withDue, `${chipsInGrid}/${withDue}`);
+
+// 메일함 골라 보기: 구글을 끄면 구글 할 일이 달력에서 사라짐
+const googleDue = (await getTodos()).filter((t) => t.site === 'mail.google.com' && t.due && !t.done).map((t) => t.id);
+const gBtn = dash.locator('.mb-toggle', { hasText: '구글' });
+check('메일함 버튼 줄에 엉뚱한 글자 없음', !(await dash.textContent('#mbBar')).includes('null'));
+check('메일함 버튼 표시(구글·네이버·사내)', (await gBtn.count()) === 1 && (await dash.locator('.mb-toggle', { hasText: '네이버' }).count()) === 1 && (await dash.locator('.mb-toggle', { hasText: '사내' }).count()) >= 1);
+await gBtn.click();
+const hiddenOk = await waitFor(async () => {
+  for (const id of googleDue) if (await dash.locator(`#calGrid .chip[data-id="${id}"]`).count()) return false;
+  return true;
+}, 3000);
+check('메일함 골라 보기: 구글을 끄면 구글 할 일이 숨겨짐', googleDue.length > 0 && hiddenOk, `${googleDue.length}개`);
+check('메일함 골라 보기: 다른 메일함 할 일은 그대로', (await dash.locator('#calGrid .chip').count()) === withDue - googleDue.length);
+await dash.screenshot({ path: path.join(OUT, '1-calendar-filter.png'), fullPage: true });
+await gBtn.click();
+check('메일함 골라 보기: 다시 켜면 표시', await waitFor(async () => (await dash.locator('#calGrid .chip').count()) === withDue, 3000));
 
 // 마감일 없는 할 일을 달력으로 끌어다 놓기
 todos = await getTodos();
@@ -193,7 +230,14 @@ check('완료: 기본 설정에서는 달력에서 숨김', await waitFor(async 
 await dash.locator(`.day[data-date="${target}"] .add`).click({ force: true });
 await dash.fill('#fTitle', '팀 회식 장소 예약');
 await dash.click('#editForm button[type="submit"]');
-check('추가: 날짜 칸의 + 로 할 일 추가', await waitFor(async () => (await getTodos()).some((t) => t.title === '팀 회식 장소 예약' && t.due === target && t.source === 'manual'), 3000));
+check('추가: 날짜 칸의 + 로 할 일 추가', await waitFor(async () => (await getTodos()).some((t) => t.title === '팀 회식 장소 예약' && t.due === target && t.source === 'manual' && t.site === ''), 3000));
+
+// 직접 추가하면서 메일함 고르기
+await dash.click('#addBtn');
+await dash.fill('#fTitle', '동창회 회비 입금');
+await dash.selectOption('#fMailbox', 'mail.naver.com');
+await dash.click('#editForm button[type="submit"]');
+check('추가: 메일함을 골라서 추가', await waitFor(async () => (await getTodos()).some((t) => t.title === '동창회 회비 입금' && t.site === 'mail.naver.com'), 3000));
 
 // 사용자가 삭제한 메일 할 일은 다시 생기지 않음
 const delId = (await getTodos()).find((t) => t.title.includes('긴급')).id;
@@ -211,8 +255,15 @@ await dash.screenshot({ path: path.join(OUT, '4-list.png'), fullPage: true });
 check('목록: 표시', (await dash.locator('.todo-row').count()) > 0);
 await dash.click('.tabs button[data-tab="settings"]');
 await dash.waitForFunction(() => document.getElementById('aiState').textContent !== '확인 중…');
+// 메일함 이름 바꾸기
+const nameInput = dash.locator('#siteList li', { hasText: '127.0.0.1' }).locator('.mb-name');
+await nameInput.fill('우리회사');
+await nameInput.press('Enter');
+await nameInput.blur();
+check('설정: 메일함 이름 바꾸기', await waitFor(async () => (await dash.evaluate(async () => (await chrome.storage.local.get('settings')).settings.mailboxes['127.0.0.1'].name)) === '우리회사', 3000));
 await dash.screenshot({ path: path.join(OUT, '5-settings.png'), fullPage: true });
-check('설정: 켠 메일함 3개 표시', (await dash.locator('#siteList li').count()) === 3);
+check('설정 탭에서는 메일함 버튼 숨김', !(await dash.isVisible('#mbBar')));
+check('설정: 켠 메일함 4개 표시', (await dash.locator('#siteList li').count()) === 4);
 check('설정: 내장 AI 상태 표시', (await dash.textContent('#aiState')).length > 0, await dash.textContent('#aiState'));
 
 // 규칙 수정 → 반영

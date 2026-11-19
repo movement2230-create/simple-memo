@@ -4,6 +4,7 @@
 // - 사용자가 켠 메일 사이트에만 content.js를 등록
 // 네트워크 요청은 하지 않습니다.
 import { analyzeSubject, mergeRules, sitePattern, subjectKey, ymd } from './rules.js';
+import { defaultMailbox } from './mailboxes.js';
 
 const SEEN_LIMIT = 5000;
 
@@ -97,8 +98,14 @@ async function enableSite(host, tabId) {
     runAt: 'document_idle',
     allFrames: true,
   }]);
-  const { sites = [] } = await get('sites');
+  const { sites = [], settings = {} } = await get(['sites', 'settings']);
   if (!sites.includes(host)) await set({ sites: [...sites, host] });
+  // 처음 켜는 메일함에 이름과 색을 정해 둠(구글/네이버는 자동, 그 밖은 "사내")
+  const mailboxes = { ...(settings.mailboxes || {}) };
+  if (!mailboxes[host]) {
+    mailboxes[host] = defaultMailbox(host, mailboxes);
+    await set({ settings: { ...settings, mailboxes } });
+  }
   if (tabId) {
     await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ['src/content.js'] }).catch(() => {});
   }

@@ -1,6 +1,7 @@
 // 달력·목록·설정 화면
 import { DEFAULT_RULES, addDays, mergeRules, parseYmd, sitePattern, ymd } from '../src/rules.js';
 import { aiAvailability, prepareModel, refineSubject } from '../src/ai.js';
+import { listMailboxes, mailboxOf } from '../src/mailboxes.js';
 
 const $ = (id) => document.getElementById(id);
 const send = (msg) => chrome.runtime.sendMessage(msg);
@@ -11,6 +12,13 @@ let todos = [];
 let settings = {};
 let sites = [];
 let view = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+// 숨긴 메일함(이 브라우저에서만 기억하는 보기 설정)
+const hidden = new Set((() => { try { return JSON.parse(localStorage.getItem('hiddenMailboxes') || '[]'); } catch { return []; } })());
+const saveHidden = () => { try { localStorage.setItem('hiddenMailboxes', JSON.stringify([...hidden])); } catch { /* 저장 못 해도 동작 */ } };
+const mb = (t) => mailboxOf(t.site, settings.mailboxes);
+const shown = (t) => !hidden.has(t.site || '');
+const dot = (m) => h('span', { class: 'mb-dot', style: `background:${m.color}`, 'aria-hidden': 'true' });
 
 // 사용자 데이터(메일 제목 등)는 항상 textContent로만 넣습니다.
 function h(tag, props = {}, ...children) {
@@ -78,9 +86,29 @@ const currentTab = () => document.querySelector('.tabs button[aria-selected="tru
 
 function render() {
   const tab = currentTab();
+  $('mbBar').hidden = tab === 'settings';
+  if (tab !== 'settings') renderMailboxBar();
   if (tab === 'calendar') renderCalendar();
   else if (tab === 'list') renderList();
   else renderSettings();
+}
+
+// ---------- 메일함 골라 보기 ----------
+function renderMailboxBar() {
+  const boxes = listMailboxes(sites, todos, settings.mailboxes);
+  const bar = $('mbBar');
+  if (boxes.length < 2) { bar.replaceChildren(); bar.hidden = true; return; }
+  const count = (key) => todos.filter((t) => !t.done && (t.site || '') === key).length;
+  bar.replaceChildren(
+    h('span', { class: 'mb-label', text: '메일함' }),
+    ...boxes.map((m) => h('button', {
+      class: 'mb-toggle',
+      'aria-pressed': String(!hidden.has(m.key)),
+      title: m.key ? `${m.name} (${m.key})` : m.name,
+      onclick: () => { hidden.has(m.key) ? hidden.delete(m.key) : hidden.add(m.key); saveHidden(); render(); },
+    }, dot(m), h('span', { text: m.name }), h('span', { class: 'mb-count', text: String(count(m.key)) }))),
+    ...(hidden.size ? [h('button', { class: 'link', text: '모두 보기', onclick: () => { hidden.clear(); saveHidden(); render(); } })] : []),
+  );
 }
 
 // ---------- 할 일 조각(달력·사이드 공용) ----------
@@ -88,7 +116,7 @@ function chip(t) {
   const el = h('div', {
     class: `chip p-${t.priority}${t.done ? ' done' : ''}${isOverdue(t) ? ' overdue' : ''}`,
     draggable: 'true',
-    title: [t.title, t.dueTime && `시간: ${t.dueTime}`, t.memo && `메모: ${t.memo}`, t.subject && t.subject !== t.title && `메일: ${t.subject}`].filter(Boolean).join('\n'),
+    title: [t.title, `메일함: ${mb(t).name}`, t.dueTime && `시간: ${t.dueTime}`, t.memo && `메모: ${t.memo}`, t.subject && t.subject !== t.title && `메일: ${t.subject}`].filter(Boolean).join('\n'),
     dataset: { id: t.id },
     onclick: () => openEdit(t.id),
     ondragstart: (e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); },
@@ -100,6 +128,7 @@ function chip(t) {
     text: t.done ? '✓' : '',
     onclick: (e) => { e.stopPropagation(); toggleDone(t); },
   }),
+  dot(mb(t)),
   t.dueTime && h('span', { class: 'time', text: t.dueTime }),
   h('span', { class: 't', text: t.title }),
   t.aiDoubt && !t.done && h('span', { class: 'ai-doubt', title: '내장 AI는 할 일이 아닐 수 있다고 판단했어요', text: 'AI?' }));
@@ -125,7 +154,7 @@ function renderCalendar() {
 
   const byDate = new Map();
   for (const t of todos) {
-    if (!t.due || (!showDone && t.done)) continue;
+    if (!t.due || (!showDone && t.done) || !shown(t)) continue;
     if (!byDate.has(t.due)) byDate.set(t.due, []);
     byDate.get(t.due).push(t);
   }
@@ -157,7 +186,7 @@ function renderCalendar() {
     grid.append(cell);
   }
 
-  const noDue = sortTodos(todos.filter((t) => !t.due && (showDone || !t.done)));
+  const noDue = sortTodos(todos.filter((t) => !t.due && (showDone || !t.done) && shown(t)));
   $('noDueCount').textContent = noDue.length ? `${noDue.length}` : '';
   $('noDueList').replaceChildren(...(noDue.length ? noDue.map((t) => h('li', {}, chip(t))) : [h('li', { class: 'empty', text: '없음' })]));
 }
@@ -172,7 +201,7 @@ makeDropZone($('noDueList'), '');
 function renderList() {
   const filter = $('listFilter').value;
   const q = $('listSearch').value.trim().toLowerCase();
-  let list = todos.filter((t) => (filter === 'all' ? true : filter === 'done' ? t.done : !t.done));
+  let list = todos.filter((t) => shown(t) && (filter === 'all' ? true : filter === 'done' ? t.done : !t.done));
   if (q) list = list.filter((t) => [t.title, t.memo, t.subject].some((s) => (s || '').toLowerCase().includes(q)));
   list = sortTodos(list);
   $('listCount').textContent = `${list.length}개`;
@@ -208,6 +237,7 @@ function row(t) {
       h('div', { class: 'title', text: t.title }),
       (t.memo || (t.subject && t.subject !== t.title)) && h('div', { class: 'sub', text: t.memo || `메일: ${t.subject}` })),
     t.aiDoubt && !t.done && h('span', { class: 'ai-doubt', title: '내장 AI는 할 일이 아닐 수 있다고 판단했어요', text: 'AI: 할 일 아님?' }),
+    h('span', { class: 'mb-tag', title: t.site || '' }, dot(mb(t)), mb(t).name),
     h('span', { class: `badge p-${t.priority}`, text: PRIORITY_LABEL[t.priority] }),
     h('span', { class: `due${isOverdue(t) ? ' overdue' : ''}`, text: formatDue(t) }),
     t.link && h('a', { href: t.link, target: '_blank', rel: 'noopener', text: '메일 ↗' }),
@@ -231,6 +261,12 @@ function openEdit(id, date = '') {
   $('fPriority').value = t?.priority || 'normal';
   $('fMemo').value = t?.memo || '';
   $('fDone').checked = !!t?.done;
+  const boxes = listMailboxes(sites, todos, settings.mailboxes);
+  if (!boxes.some((m) => m.key === '')) boxes.push(mailboxOf(''));
+  $('fMailbox').replaceChildren(...boxes.map((m) => h('option', { value: m.key, text: m.key ? `${m.name} (${m.key})` : m.name })));
+  // 새로 추가할 때는 지금 하나만 보고 있는 메일함을 기본값으로
+  const onlyShown = boxes.filter((m) => !hidden.has(m.key));
+  $('fMailbox').value = t ? t.site || '' : onlyShown.length === 1 ? onlyShown[0].key : '';
   $('fDelete').hidden = !t;
   const fromMail = t?.source === 'mail';
   $('fOrigin').hidden = !fromMail;
@@ -254,6 +290,7 @@ $('editForm').addEventListener('submit', async (e) => {
     priority: $('fPriority').value,
     memo: $('fMemo').value,
     done: $('fDone').checked,
+    site: $('fMailbox').value,
   };
   if (editingId) await update(editingId, { ...fields, edited: true, aiDoubt: false });
   else await send({ type: 'todo:add', todo: { ...fields, source: 'manual' } });
@@ -270,9 +307,23 @@ $('addBtn').onclick = () => openEdit(null, currentTab() === 'calendar' ? today()
 
 // ---------- 설정 ----------
 function renderSettings() {
-  $('siteList').replaceChildren(...(sites.length
+  const saveMailbox = (host, patch) => send({
+    type: 'settings:set',
+    patch: { mailboxes: { ...(settings.mailboxes || {}), [host]: { ...mailboxOf(host, settings.mailboxes), ...patch, key: undefined } } },
+  });
+  // 이름을 고치는 중이면 다시 그리지 않음(입력이 끊기지 않게)
+  if (!document.activeElement?.closest('#siteList')) $('siteList').replaceChildren(...(sites.length
     ? sites.map((host) => h('li', {},
-      h('span', { text: host }),
+      h('input', { type: 'color', value: mailboxOf(host, settings.mailboxes).color, 'aria-label': `${host} 색`, onchange: (e) => saveMailbox(host, { color: e.target.value }) }),
+      h('input', {
+        type: 'text',
+        class: 'mb-name',
+        value: mailboxOf(host, settings.mailboxes).name,
+        maxlength: '20',
+        'aria-label': `${host} 이름`,
+        onchange: (e) => { const name = e.target.value.trim(); if (name) saveMailbox(host, { name }); },
+      }),
+      h('span', { class: 'muted host', text: host }),
       h('button', {
         class: 'danger',
         text: '끄기',

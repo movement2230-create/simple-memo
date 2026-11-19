@@ -14,9 +14,13 @@
 
   <section class="site">
     <div class="site-line">
+      <span id="siteDot" class="mb-dot" hidden></span>
       <span id="siteName" class="site-name"></span>
       <span id="siteState" class="site-state"></span>
     </div>
+    <label id="mbNameRow" class="mb-name-row" hidden>메일함 이름
+      <input type="text" id="mbName" maxlength="20" placeholder="예: 사내, 구글, 네이버">
+    </label>
     <p id="siteHelp" class="muted"></p>
     <div class="row">
       <button id="toggleSite"></button>
