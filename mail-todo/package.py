@@ -38,7 +38,9 @@ def check(files: list[Path]) -> dict:
     included = {f.relative_to(ROOT).as_posix() for f in files}
     needed = set(manifest.get("icons", {}).values())
     needed |= set(manifest.get("action", {}).get("default_icon", {}).values())
-    needed.add(manifest["action"]["default_popup"])
+    for page in (manifest["action"].get("default_popup"), manifest.get("side_panel", {}).get("default_path")):
+        if page:
+            needed.add(page)
     needed.add(manifest["background"]["service_worker"])
     needed.add("src/content.js")  # 사이트를 켤 때 등록하는 스크립트
     # HTML의 <script src>, <link href>와 JS의 import 경로도 확인

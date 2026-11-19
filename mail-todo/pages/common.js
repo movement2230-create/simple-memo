@@ -38,6 +38,9 @@ export const toggleDone = (t) => update(t.id, { done: !t.done });
 
 // ---------- 날짜·정렬 ----------
 export const today = () => ymd(new Date());
+// "홍길동 <hong@x.com>" → "홍길동"
+export const senderName = (s) => String(s || '').replace(/\s*<[^>]*>\s*$/, '').trim() || String(s || '');
+export const matches = (t, q) => [t.title, t.memo, t.subject, t.sender].some((s) => (s || '').toLowerCase().includes(q));
 export const isOverdue = (t) => !t.done && t.due && t.due < today();
 
 export function sortTodos(list) {
@@ -152,6 +155,7 @@ const DIALOG_HTML = `
   <div id="fOrigin" class="origin" hidden>
     <div class="muted">원래 메일 제목</div>
     <div id="fSubject"></div>
+    <div id="fSenderRow" hidden><span class="muted">보낸 사람</span> <span id="fSender"></span></div>
     <a id="fLink" target="_blank" rel="noopener" hidden>메일 열기 ↗</a>
   </div>
   <div class="dlg-actions">
@@ -219,6 +223,8 @@ export function openEdit(id, date = '') {
   $('fOrigin').hidden = !fromMail;
   if (fromMail) {
     $('fSubject').textContent = `${t.subject}${t.site ? ` (${t.site})` : ''}`;
+    $('fSenderRow').hidden = !t.sender;
+    $('fSender').textContent = t.sender || '';
     $('fLink').hidden = !t.link;
     if (t.link) $('fLink').href = t.link;
   }

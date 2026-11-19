@@ -1,7 +1,7 @@
 // 실행: node --test mail-todo/tests/
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeSubject, parseDue, parseTime, cleanTitle, ymd, subjectKey } from '../src/rules.js';
+import { DEFAULT_RULES, analyzeSubject, parseDue, parseTime, cleanTitle, ymd, subjectKey } from '../src/rules.js';
 
 // 기준일: 2026-11-19 (목요일)
 const BASE = new Date(2026, 10, 19, 9, 0);
@@ -103,4 +103,15 @@ test('사용자 규칙 적용', () => {
 
 test('같은 스레드는 같은 키', () => {
   assert.equal(subjectKey('mail.x.com', '견적 요청'), subjectKey('mail.x.com', 'RE: RE: 견적 요청'));
+});
+
+test('보낸 사람 규칙', () => {
+  const rules = { ...DEFAULT_RULES, vipSenders: ['김부장', 'ceo@company.com'] };
+  assert.equal(analyzeSubject('자료 검토 부탁드립니다', BASE, rules, '김부장').priority, 'high');
+  assert.equal(analyzeSubject('자료 검토 부탁드립니다', BASE, rules, 'CEO <ceo@company.com>').priority, 'high');
+  assert.equal(analyzeSubject('자료 검토 부탁드립니다', BASE, rules, '이대리').priority, 'normal');
+  // no-reply 발신 메일은 할 일이 아님
+  assert.equal(analyzeSubject('결제 승인 요청', BASE, rules, 'no-reply@shop.com').isTask, false);
+  // 보낸 사람이 없어도 그대로 동작
+  assert.equal(analyzeSubject('결제 승인 요청', BASE, rules).isTask, true);
 });

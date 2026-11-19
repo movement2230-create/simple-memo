@@ -24,6 +24,7 @@ function newTodo(fields) {
     id: crypto.randomUUID(),
     title: '',
     subject: '',
+    sender: '',
     due: null,
     dueTime: null,
     priority: 'normal',
@@ -45,19 +46,28 @@ async function processSubjects(site, items) {
   const rules = mergeRules(settings.rules);
   const now = new Date();
   let added = 0;
+  // 보낸 사람 없이 만들어진 할 일에 나중에 보낸 사람을 채워 넣기 위한 표
+  const bySubject = new Map(todos.filter((t) => t.source === 'mail' && !t.sender).map((t) => [subjectKey(t.site, t.subject), t]));
 
   for (const it of items || []) {
     const subject = String(it?.subject || '').replace(/\s+/g, ' ').trim().slice(0, 300);
     if (!subject) continue;
+    const sender = String(it?.sender || '').replace(/\s+/g, ' ').trim().slice(0, 120);
     const key = subjectKey(site, subject);
-    if (seen[key]) continue; // 이미 본 메일(삭제한 할 일도 다시 만들지 않음)
+    if (seen[key]) {
+      // 이미 본 메일(삭제한 할 일도 다시 만들지 않음). 보낸 사람만 비어 있으면 채움
+      const old = sender && bySubject.get(key);
+      if (old) { old.sender = sender; bySubject.delete(key); }
+      continue;
+    }
     seen[key] = now.getTime();
 
-    const r = analyzeSubject(subject, now, rules);
+    const r = analyzeSubject(subject, now, rules, sender);
     if (!r.isTask) continue;
     todos.push(newTodo({
       title: r.title,
       subject,
+      sender,
       due: r.due,
       dueTime: r.dueTime,
       priority: r.priority,

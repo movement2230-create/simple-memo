@@ -54,7 +54,7 @@ const GMAIL = `<!doctype html><meta charset="utf-8"><title>Gmail</title><table><
   ['Please review the Q4 budget by Friday', '18a1'],
   ['Weekly newsletter #42', '18a2'],
   ['계약서 초안 회신 부탁드립니다', '18a3'],
-].map(([s, id], i) => `<tr class="zA ${i ? 'yO' : 'zE'}"><td><span class="yP">Sender</span></td><td><div class="y6"><span class="bog"><span data-legacy-thread-id="${id}">${s}</span></span></div></td></tr>`).join('')}</tbody></table>`;
+].map(([s, id], i) => `<tr class="zA ${i ? 'yO' : 'zE'}"><td><div class="yW"><span class="yP" email="pm${i}@partner.com" name="Kim PM${i}">Kim PM${i}</span></div></td><td><div class="y6"><span class="bog"><span data-legacy-thread-id="${id}">${s}</span></span></div></td></tr>`).join('')}</tbody></table>`;
 
 // 네이버 메일형: 제목이 mail_title 안의 링크
 const NAVER = `<!doctype html><meta charset="utf-8"><title>네이버 메일</title><ol>${[
@@ -128,6 +128,7 @@ check('그룹웨어: 11/25 마감일', card?.due?.endsWith('-11-25'), card?.due)
 check('그룹웨어: 메일 링크 저장', /\/mail\/\d+$/.test(card?.link || ''), card?.link);
 const meeting = todos.find((t) => t.title.includes('주간 회의'));
 check('그룹웨어: 오늘 15:00', meeting?.dueTime === '15:00', `${meeting?.due} ${meeting?.dueTime}`);
+check('그룹웨어: 보낸 사람 읽기', card?.sender === '홍길동0', card?.sender);
 check('그룹웨어: 긴급은 우선순위 높음', todos.find((t) => t.title.includes('긴급'))?.priority === 'high');
 const gotNew = await waitFor(async () => (await getTodos()).some((t) => t.title.includes('워크숍')), 8000);
 check('그룹웨어: 새로 도착한 메일도 자동으로 읽음', gotNew);
@@ -139,6 +140,7 @@ await waitFor(async () => (await getTodos()).some((t) => t.site === 'mail.google
 todos = await getTodos();
 const gmTodos = todos.filter((t) => t.site === 'mail.google.com');
 check('Gmail형: 할 일 2개(뉴스레터 제외)', gmTodos.length === 2, gmTodos.map((t) => t.title).join(' | '));
+check('Gmail형: 보낸 사람 이름과 메일 주소', gmTodos.some((t) => t.sender === 'Kim PM0 <pm0@partner.com>'), gmTodos.map((t) => t.sender).join(' | '));
 check('Gmail형: 스레드 링크', gmTodos.some((t) => t.link.endsWith('#all/18a1')));
 
 // 2-1) 네이버 메일형
@@ -147,7 +149,8 @@ await nv.goto('https://mail.naver.com/v2/folders/0/all');
 await waitFor(async () => (await getTodos()).filter((t) => t.site === 'mail.naver.com').length >= 2);
 const nvTodos = (await getTodos()).filter((t) => t.site === 'mail.naver.com');
 check('네이버형: 할 일 2개(결제완료 안내 제외)', nvTodos.length === 2, nvTodos.map((t) => `${t.title}(${t.due})`).join(' | '));
-check('네이버형: 보낸 사람은 안 읽음', !nvTodos.some((t) => t.title.includes('보낸이')));
+check('네이버형: 보낸 사람이 제목에 섞이지 않음', !nvTodos.some((t) => t.title.includes('보낸이')));
+check('네이버형: 보낸 사람 읽기', nvTodos.every((t) => /^보낸이\d$/.test(t.sender)), nvTodos.map((t) => t.sender).join(' | '));
 
 // 3) 알아보기 어려운 메일함: 자동으로 못 찾고, 직접 지정하면 찾음
 await bg({ type: 'site:enable', host: 'localhost' });
@@ -159,10 +162,16 @@ const wmTabId = await dash.evaluate(async (u) => (await chrome.tabs.query({ url:
 await dash.evaluate((id) => chrome.tabs.sendMessage(id, { type: 'pick' }), wmTabId);
 await wm.screenshot({ path: path.join(OUT, '3-pick-mode.png') });
 await wm.getByText('보안 교육 이수 요청').click();
-await waitFor(async () => (await getTodos()).filter((t) => t.site === 'localhost').length >= 2);
+const pageText = () => wm.evaluate(() => document.documentElement.textContent); // 안내 문구는 <html> 바로 아래에 붙음
+check('직접 지정: 보낸 사람을 못 찾으면 보낸 사람도 클릭하라고 안내', await waitFor(async () => (await pageText()).includes('보낸 사람 이름을 클릭'), 3000));
+await wm.screenshot({ path: path.join(OUT, '3-pick-sender.png') });
+await wm.getByText('김철수').nth(1).click();
+await waitFor(async () => (await getTodos()).filter((t) => t.site === 'localhost' && t.sender).length >= 2);
 const wmTodos = (await getTodos()).filter((t) => t.site === 'localhost');
 check('직접 지정 후: 할 일 2개(동호회 안내 제외)', wmTodos.length === 2, wmTodos.map((t) => `${t.title}(${t.due})`).join(' | '));
-check('직접 지정 후: 보낸 사람·시간은 안 읽음', !wmTodos.some((t) => /김철수|오전/.test(t.title)));
+check('직접 지정 후: 보낸 사람·시간이 제목에 섞이지 않음', !wmTodos.some((t) => /김철수|오전/.test(t.title)));
+check('직접 지정 후: 결과 안내', await waitFor(async () => /보낸 사람 \d+개를 찾았어요/.test(await pageText()), 3000), (await pageText()).match(/제목 \d+개[^\n]*/)?.[0]);
+check('직접 지정 후: 보낸 사람 읽기', wmTodos.every((t) => t.sender === '김철수'), wmTodos.map((t) => t.sender).join(' | '));
 await wm.screenshot({ path: path.join(OUT, '3-pick-result.png') });
 
 // 3-1) 메일함 이름·색 자동 지정
@@ -271,6 +280,10 @@ await dash.fill('#ruleTask', '품의\n검토');
 await dash.click('#saveRules');
 await waitFor(async () => (await dash.evaluate(async () => (await chrome.storage.local.get('settings')).settings?.rules?.taskKeywords?.length)) === 2, 3000);
 await bg({ type: 'subjects', site: 'test', items: [{ subject: '출장 품의서 올렸습니다' }, { subject: '자료 제출 부탁드립니다' }] });
+await bg({ type: 'settings:set', patch: { rules: { taskKeywords: ['검토'], vipSenders: ['김부장'], excludeSenders: ['no-reply'] } } });
+await bg({ type: 'subjects', site: 'test2', items: [{ subject: '예산안 검토', sender: '김부장 <boss@co.kr>' }, { subject: '주문 검토', sender: 'no-reply@shop.com' }] });
+const t2 = (await getTodos()).filter((t) => t.site === 'test2');
+check('규칙: 중요한 보낸 사람은 우선순위 높음', t2.length === 1 && t2[0].priority === 'high' && t2[0].sender === '김부장 <boss@co.kr>', JSON.stringify(t2.map((t) => [t.title, t.priority, t.sender])));
 todos = (await getTodos()).filter((t) => t.site === 'test');
 check('규칙: 사용자가 바꾼 단어로 판단', todos.length === 1 && todos[0].title.includes('품의서'), todos.map((t) => t.title).join(' | '));
 
@@ -292,6 +305,11 @@ check('사이드 패널: 끝내지 않은 할 일이 목록에 모두 표시', (
 const dotsOn28 = await panel.locator(`.mc-day[data-date="${target}"] .mb-dot`).count();
 check('사이드 패널: 할 일 있는 날짜에 메일함 색 점', dotsOn28 > 0, `${target}: ${dotsOn28}개`);
 await panel.screenshot({ path: path.join(OUT, '6-sidepanel.png') });
+
+check('사이드 패널: 목록에 보낸 사람 표시', (await panel.locator('.sp-item .sender', { hasText: '홍길동' }).count()) > 0);
+await panel.fill('#listSearch', 'Kim PM');
+check('사이드 패널: 보낸 사람으로 검색', await waitFor(async () => (await panel.locator('.sp-item').count()) === (await getTodos()).filter((t) => !t.done && (t.sender || '').includes('Kim PM')).length, 3000));
+await panel.fill('#listSearch', '');
 
 // 날짜를 누르면 그날 할 일만
 await panel.click(`.mc-day[data-date="${target}"]`);

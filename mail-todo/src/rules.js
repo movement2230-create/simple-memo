@@ -18,6 +18,10 @@ export const DEFAULT_RULES = {
   ],
   // 이 단어가 있으면 우선순위를 '높음'으로 둡니다.
   urgentKeywords: ['긴급', '급함', '시급', '중요', 'asap', 'urgent', 'important'],
+  // 이 보낸 사람(이름이나 메일 주소 일부)의 메일은 우선순위를 '높음'으로 둡니다. 예: 팀장 이름, boss@company.com
+  vipSenders: [],
+  // 이 보낸 사람의 메일은 할 일로 만들지 않습니다.
+  excludeSenders: ['no-reply', 'noreply', 'donotreply', 'do-not-reply', 'mailer-daemon', 'notification', 'notifications'],
 };
 
 export const PRIORITIES = ['high', 'normal', 'low'];
@@ -186,11 +190,11 @@ export function mergeRules(custom) {
   return r;
 }
 
-export function analyzeSubject(subject, base = new Date(), rules = DEFAULT_RULES) {
+export function analyzeSubject(subject, base = new Date(), rules = DEFAULT_RULES, sender = '') {
   const title = cleanTitle(subject);
   const taskHits = findKeywords(title, rules.taskKeywords);
-  const excludeHits = findKeywords(title, rules.excludeKeywords);
-  const urgentHits = findKeywords(title, rules.urgentKeywords);
+  const excludeHits = [...findKeywords(title, rules.excludeKeywords), ...findKeywords(sender, rules.excludeSenders)];
+  const urgentHits = [...findKeywords(title, rules.urgentKeywords), ...findKeywords(sender, rules.vipSenders)];
   const dueDate = parseDue(title, base);
   const dueTime = dueDate ? parseTime(title) : null;
 

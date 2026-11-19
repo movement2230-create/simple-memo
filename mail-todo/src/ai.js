@@ -3,7 +3,7 @@
 // 내장 AI가 없는 브라우저에서는 아무 일도 하지 않습니다(규칙 기반 결과만 사용).
 
 const SYSTEM = [
-  '너는 회사 메일 제목만 보고 할 일을 정리하는 도우미다.',
+  '너는 회사 메일의 제목(과 보낸 사람)만 보고 할 일을 정리하는 도우미다.',
   '받는 사람이 해야 할 행동(검토, 회신, 제출, 참석 등)이 있으면 isTask는 true, 단순 공유·안내·광고면 false.',
   'title은 해야 할 일을 40자 이내의 짧은 한국어로 쓴다. 예: "3분기 보고서 검토 후 회신".',
   'due는 제목에 마감일이나 일정 날짜가 있을 때만 오늘 날짜를 기준으로 YYYY-MM-DD 형식, 없으면 빈 문자열.',
@@ -46,11 +46,11 @@ export async function prepareModel(onProgress) {
   return base;
 }
 
-export async function refineSubject(subject, today) {
+export async function refineSubject(subject, today, sender = '') {
   const root = await prepareModel();
   const s = await root.clone(); // 메일마다 새 대화로(앞 메일 내용이 섞이지 않게)
   try {
-    const out = await s.prompt(`오늘: ${today}\n메일 제목: ${subject}`, { responseConstraint: SCHEMA });
+    const out = await s.prompt(`오늘: ${today}\n${sender ? `보낸 사람: ${sender}\n` : ''}메일 제목: ${subject}`, { responseConstraint: SCHEMA });
     const r = JSON.parse(out);
     return {
       isTask: r.isTask !== false,

@@ -1,5 +1,5 @@
-// 메일 목록 화면에서 "제목"만 읽어 확장 프로그램 백그라운드로 넘깁니다.
-// 본문·보낸 사람·첨부는 읽지 않으며, 어떤 서버로도 보내지 않습니다.
+// 메일 목록 화면에서 "제목"과 "보낸 사람"만 읽어 확장 프로그램 백그라운드로 넘깁니다.
+// 본문·첨부는 읽지 않으며, 어떤 서버로도 보내지 않습니다.
 // 사용자가 확장 프로그램 팝업에서 켠 메일 사이트에서만 실행됩니다.
 (() => {
   if (window.__mailTodoLoaded) return;
@@ -20,7 +20,7 @@
         const s = row.querySelector('.bog');
         if (!s) return null;
         const id = row.querySelector('[data-legacy-thread-id]')?.getAttribute('data-legacy-thread-id');
-        return { subject: clean(s.textContent), link: id ? `${location.href.split('#')[0]}#all/${id}` : '' };
+        return { subject: clean(s.textContent), sender: guessSender(row, s), link: id ? `${location.href.split('#')[0]}#all/${id}` : '' };
       }),
     },
   ];
@@ -46,10 +46,38 @@
       }
       const best = [...groups.values()].sort((a, b) => b.length - a.length)[0];
       if (best && best.length >= 3) {
-        return best.map((el) => ({ subject: clean(el.textContent), link: el.closest('a[href]')?.href || '' }));
+        return best.map((el) => {
+          const row = findRow(el);
+          return { subject: clean(el.textContent), sender: row ? guessSender(row, el) : '', link: el.closest('a[href]')?.href || '' };
+        });
       }
     }
     return [];
+  }
+
+  // ---------- 보낸 사람 ----------
+  // 메일 주소 속성(email)이나 이름에 sender/from/writer/name이 들어간 요소를 보낸 사람으로 봄
+  const SENDER_SELECTORS = [
+    '[email]', '[data-email]', '[class*="sender" i]', '[data-testid*="sender" i]', '[class*="from" i]',
+    '[class*="writer" i]', '[class*="author" i]', '[class*="name" i]',
+  ];
+
+  function senderText(el) {
+    const email = el.getAttribute('email') || el.getAttribute('data-email') || '';
+    const name = clean(el.getAttribute('name') || el.textContent).slice(0, 80);
+    if (email && !name.includes(email)) return name ? `${name} <${email}>` : email;
+    return name;
+  }
+
+  function guessSender(row, subjectEl) {
+    for (const sel of SENDER_SELECTORS) {
+      for (const el of row.querySelectorAll(sel)) {
+        if (el === subjectEl || el.contains(subjectEl) || subjectEl.contains(el)) continue;
+        const t = senderText(el);
+        if (t && t.length <= 80) return t;
+      }
+    }
+    return '';
   }
 
   // ---------- 3) 사용자가 직접 지정한 목록 ----------
@@ -91,7 +119,13 @@
       let s = null;
       try { s = row.querySelector(`:scope > ${p.subject}`); } catch { return []; }
       if (!s) continue;
-      out.push({ subject: clean(s.textContent), link: s.closest('a[href]')?.href || row.querySelector('a[href]')?.href || '' });
+      let sender = '';
+      if (p.sender) {
+        try { const f = row.querySelector(`:scope > ${p.sender}`); if (f) sender = senderText(f); } catch { /* 무시 */ }
+      } else {
+        sender = guessSender(row, s);
+      }
+      out.push({ subject: clean(s.textContent), sender, link: s.closest('a[href]')?.href || row.querySelector('a[href]')?.href || '' });
     }
     return out;
   }
@@ -139,12 +173,16 @@
 
   // ---------- 목록 직접 지정 모드 ----------
   let picking = false;
+  let stage = 'subject'; // 'subject' → 'sender'
+  let pending = null; // 제목까지 정한 지정 정보
   let box = null;
   let banner = null;
 
   function startPick() {
     if (picking) return;
     picking = true;
+    stage = 'subject';
+    pending = null;
     box = document.createElement('div');
     box.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #e0a526;background:rgba(224,165,38,.15);border-radius:4px;transition:all .05s';
     banner = document.createElement('div');
@@ -177,13 +215,49 @@
   }
 
   function onKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); endPick('취소했어요'); }
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    if (stage === 'sender') finish(pending, '보낸 사람 없이 저장했어요.');
+    else endPick('취소했어요');
+  }
+
+  function flashOutline(els, color) {
+    els.forEach((m) => { m.dataset.mailTodoOutline = m.style.outline; m.style.outline = `2px solid ${color}`; });
+    setTimeout(() => els.forEach((m) => { m.style.outline = m.dataset.mailTodoOutline || ''; delete m.dataset.mailTodoOutline; }), 2500);
+  }
+
+  const cellsOf = (p, chain) => [...document.querySelectorAll(p.row)]
+    .map((r) => { try { return r.querySelector(`:scope > ${chain}`); } catch { return null; } }).filter(Boolean);
+
+  let savingHere = false;
+  async function finish(picker, note = '') {
+    savingHere = true;
+    await chrome.runtime.sendMessage({ type: 'picker:save', site: SITE, picker });
+    flashOutline(cellsOf(picker, picker.subject), '#2e9d5b');
+    if (picker.sender) flashOutline(cellsOf(picker, picker.sender), '#2b6cb0');
+    const found = collectPicked(picker);
+    const withSender = found.filter((f) => f.sender).length;
+    const res = await scan(true);
+    savingHere = false;
+    endPick(`${note ? note + ' ' : ''}제목 ${found.length}개${withSender ? `, 보낸 사람 ${withSender}개` : ''}를 찾았어요. 새 할 일 ${res.added}개`);
   }
 
   async function onClick(e) {
     e.preventDefault();
     e.stopPropagation();
     const el = e.target;
+
+    if (stage === 'sender') {
+      const row = el.closest(pending.row);
+      const subj = row?.querySelector(`:scope > ${pending.subject}`);
+      if (!row || !subj || subj.contains(el) || el.contains(subj)) {
+        banner.textContent = '메일 목록 안에서 보낸 사람 이름을 클릭해 주세요 (Esc: 보낸 사람 없이 저장)';
+        return;
+      }
+      finish({ ...pending, sender: chainFrom(row, el) });
+      return;
+    }
+
     const row = findRow(el);
     if (!row) {
       banner.textContent = '목록을 찾지 못했어요. 다른 메일의 제목을 클릭해 보세요 (Esc: 취소)';
@@ -195,19 +269,21 @@
       banner.textContent = '제목을 하나만 찾았어요. 다른 제목을 클릭해 보세요 (Esc: 취소)';
       return;
     }
-    await chrome.runtime.sendMessage({ type: 'picker:save', site: SITE, picker });
-    // 찾은 제목을 잠깐 표시
-    const marks = [...document.querySelectorAll(picker.row)]
-      .map((r) => r.querySelector(`:scope > ${picker.subject}`)).filter(Boolean);
-    marks.forEach((m) => { m.dataset.mailTodoOutline = m.style.outline; m.style.outline = '2px solid #2e9d5b'; });
-    setTimeout(() => marks.forEach((m) => { m.style.outline = m.dataset.mailTodoOutline || ''; delete m.dataset.mailTodoOutline; }), 2500);
-    const res = await scan(true);
-    endPick(`제목 ${found.length}개를 찾았어요. 새 할 일 ${res.added}개`);
+    // 보낸 사람을 자동으로 절반 이상 찾으면 그대로 저장, 아니면 보낸 사람도 클릭받기
+    if (found.filter((f) => f.sender).length >= found.length / 2) {
+      finish(picker);
+      return;
+    }
+    pending = picker;
+    stage = 'sender';
+    flashOutline(cellsOf(picker, picker.subject), '#2e9d5b');
+    banner.textContent = `제목 ${found.length}개를 찾았어요. 이제 같은 메일의 보낸 사람 이름을 클릭해 주세요 (Esc: 건너뛰기)`;
   }
 
   // 다른 프레임에서 지정을 마치면 여기서도 지정 모드 종료
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.pickers && picking) endPick();
+    // (이 프레임에서 저장한 경우는 finish()가 결과 메시지와 함께 끝냄)
+    if (area === 'local' && changes.pickers && picking && !savingHere) endPick();
   });
 
   // ---------- 팝업에서 오는 요청 ----------

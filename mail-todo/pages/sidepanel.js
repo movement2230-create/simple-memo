@@ -3,7 +3,7 @@ import { addDays, sitePattern, ymd } from '../src/rules.js';
 import { mailboxOf } from '../src/mailboxes.js';
 import {
   $, send, h, state, load, toggleDone, today, isOverdue, sortTodos, formatDue, groupTodos,
-  PRIORITY_LABEL, mb, shown, dot, renderMailboxBar, onHiddenChange, draggable, makeDropZone, openEdit,
+  PRIORITY_LABEL, mb, shown, dot, renderMailboxBar, onHiddenChange, draggable, makeDropZone, openEdit, senderName, matches,
 } from './common.js';
 
 const openPage = (hash = '') => chrome.tabs.create({ url: chrome.runtime.getURL(`pages/dashboard.html${hash}`) });
@@ -97,7 +97,7 @@ function item(t) {
   return draggable(h('div', {
     class: `sp-item p-${t.priority}${t.done ? ' done' : ''}`,
     dataset: { id: t.id },
-    title: t.subject && t.subject !== t.title ? `메일: ${t.subject}` : '',
+    title: [t.sender && `보낸 사람: ${t.sender}`, t.subject && t.subject !== t.title && `메일: ${t.subject}`].filter(Boolean).join('\n'),
     onclick: () => openEdit(t.id),
   },
   h('button', {
@@ -110,6 +110,7 @@ function item(t) {
     h('div', { class: 'title', text: t.title }),
     h('div', { class: 'meta' },
       h('span', { class: 'mb-tag', title: t.site || '' }, dot(m), m.name),
+      t.sender && h('span', { class: 'sender', title: t.sender, text: senderName(t.sender) }),
       h('span', { class: `due${isOverdue(t) ? ' overdue' : ''}`, text: formatDue(t, { short: true }) }),
       t.priority !== 'normal' && h('span', { class: `badge p-${t.priority}`, text: PRIORITY_LABEL[t.priority] }),
       t.aiDoubt && !t.done && h('span', { class: 'ai-doubt', title: '내장 AI는 할 일이 아닐 수 있다고 판단했어요', text: 'AI: 할 일 아님?' }),
@@ -122,7 +123,7 @@ function renderList() {
   const q = $('listSearch').value.trim().toLowerCase();
   let list = state.todos.filter((t) => shown(t) && (showDone || !t.done));
   if (selected) list = list.filter((t) => t.due === selected);
-  if (q) list = list.filter((t) => [t.title, t.memo, t.subject].some((s) => (s || '').toLowerCase().includes(q)));
+  if (q) list = list.filter((t) => matches(t, q));
   list = sortTodos(list);
 
   if (selected) {
@@ -186,8 +187,8 @@ async function renderSite() {
   $('siteState').textContent = on ? '수집 중' : '꺼짐';
   $('siteState').classList.toggle('on', on);
   $('siteHelp').textContent = on
-    ? `${host} · 목록에 보이는 메일 제목을 자동으로 읽어요.`
-    : '켜면 이 사이트의 메일 목록에서 제목만 읽어 할 일을 만들어요. 브라우저가 이 사이트 접근 권한을 물어봐요.';
+    ? `${host} · 목록에 보이는 메일 제목과 보낸 사람을 자동으로 읽어요.`
+    : '켜면 이 사이트의 메일 목록에서 제목과 보낸 사람만 읽어 할 일을 만들어요(본문은 안 읽어요). 브라우저가 이 사이트 접근 권한을 물어봐요.';
   $('toggleSite').hidden = false;
   $('toggleSite').textContent = on ? '끄기' : '이 메일함에서 켜기';
   $('toggleSite').className = on ? '' : 'primary';

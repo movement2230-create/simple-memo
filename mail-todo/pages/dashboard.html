@@ -55,7 +55,7 @@
           <option value="done">완료</option>
           <option value="all">전체</option>
         </select>
-        <input type="search" id="listSearch" placeholder="검색 (제목, 메모, 원래 메일 제목)">
+        <input type="search" id="listSearch" placeholder="검색 (제목, 보낸 사람, 메모, 원래 메일 제목)">
         <span id="listCount" class="muted"></span>
       </div>
       <div id="listBody"></div>
@@ -77,6 +77,8 @@
             <label>할 일로 볼 단어<textarea id="ruleTask" rows="10"></textarea></label>
             <label>제외할 단어 (마감일이 있어도 제외)<textarea id="ruleExclude" rows="10"></textarea></label>
             <label>우선순위 '높음' 단어<textarea id="ruleUrgent" rows="10"></textarea></label>
+            <label>중요한 보낸 사람 (우선순위 '높음')<textarea id="ruleVip" rows="5" placeholder="이름이나 메일 주소 일부&#10;예: 김부장&#10;boss@company.com"></textarea></label>
+            <label>제외할 보낸 사람<textarea id="ruleExcludeSender" rows="5"></textarea></label>
           </div>
           <div class="row">
             <button id="saveRules" class="primary">규칙 저장</button>
@@ -87,7 +89,7 @@
 
         <article class="card">
           <h3>브라우저 내장 AI</h3>
-          <p class="muted">Chrome(Gemini Nano)이나 Edge(Phi-4-mini 등)에 들어 있는 AI가 이 PC 안에서만 할 일 문장과 마감일을 다듬어요. 메일 제목은 외부로 나가지 않아요. 내장 AI가 없으면 규칙만으로 동작해요.</p>
+          <p class="muted">Chrome(Gemini Nano)이나 Edge(Phi-4-mini 등)에 들어 있는 AI가 이 PC 안에서만 할 일 문장과 마감일을 다듬어요. 메일 제목과 보낸 사람은 외부로 나가지 않아요. 내장 AI가 없으면 규칙만으로 동작해요.</p>
           <label class="check"><input type="checkbox" id="useAI"> 내장 AI로 다듬기</label>
           <p>상태: <span id="aiState">확인 중…</span></p>
           <div class="row">

@@ -4,7 +4,7 @@ import { aiAvailability, prepareModel, refineSubject } from '../src/ai.js';
 import { mailboxOf } from '../src/mailboxes.js';
 import {
   $, send, h, state, load as loadState, update, toggleDone, today, isOverdue, sortTodos, formatDue, groupTodos,
-  PRIORITY_LABEL, mb, shown, dot, renderMailboxBar, onHiddenChange, draggable, makeDropZone, openEdit,
+  PRIORITY_LABEL, mb, shown, dot, renderMailboxBar, onHiddenChange, draggable, makeDropZone, openEdit, senderName, matches,
 } from './common.js';
 
 let todos = [];
@@ -48,7 +48,7 @@ function render() {
 function chip(t) {
   return draggable(h('div', {
     class: `chip p-${t.priority}${t.done ? ' done' : ''}${isOverdue(t) ? ' overdue' : ''}`,
-    title: [t.title, `메일함: ${mb(t).name}`, t.dueTime && `시간: ${t.dueTime}`, t.memo && `메모: ${t.memo}`, t.subject && t.subject !== t.title && `메일: ${t.subject}`].filter(Boolean).join('\n'),
+    title: [t.title, `메일함: ${mb(t).name}`, t.sender && `보낸 사람: ${t.sender}`, t.dueTime && `시간: ${t.dueTime}`, t.memo && `메모: ${t.memo}`, t.subject && t.subject !== t.title && `메일: ${t.subject}`].filter(Boolean).join('\n'),
     dataset: { id: t.id },
     onclick: () => openEdit(t.id),
   },
@@ -119,7 +119,7 @@ function renderList() {
   const filter = $('listFilter').value;
   const q = $('listSearch').value.trim().toLowerCase();
   let list = todos.filter((t) => shown(t) && (filter === 'all' ? true : filter === 'done' ? t.done : !t.done));
-  if (q) list = list.filter((t) => [t.title, t.memo, t.subject].some((s) => (s || '').toLowerCase().includes(q)));
+  if (q) list = list.filter((t) => matches(t, q));
   list = sortTodos(list);
   $('listCount').textContent = `${list.length}개`;
 
@@ -140,7 +140,10 @@ function row(t) {
     h('button', { class: `chk${t.done ? ' on' : ''}`, 'aria-label': t.done ? '완료 취소' : '완료', text: t.done ? '✓' : '', onclick: () => toggleDone(t) }),
     h('div', { class: 'main', onclick: () => openEdit(t.id) },
       h('div', { class: 'title', text: t.title }),
-      (t.memo || (t.subject && t.subject !== t.title)) && h('div', { class: 'sub', text: t.memo || `메일: ${t.subject}` })),
+      (t.memo || t.sender || (t.subject && t.subject !== t.title)) && h('div', {
+        class: 'sub',
+        text: t.memo || [t.sender && senderName(t.sender), t.subject && t.subject !== t.title && `메일: ${t.subject}`].filter(Boolean).join(' · '),
+      })),
     t.aiDoubt && !t.done && h('span', { class: 'ai-doubt', title: '내장 AI는 할 일이 아닐 수 있다고 판단했어요', text: 'AI: 할 일 아님?' }),
     h('span', { class: 'mb-tag', title: t.site || '' }, dot(mb(t)), mb(t).name),
     h('span', { class: `badge p-${t.priority}`, text: PRIORITY_LABEL[t.priority] }),
@@ -190,6 +193,8 @@ function renderSettings() {
     $('ruleTask').value = rules.taskKeywords.join('\n');
     $('ruleExclude').value = rules.excludeKeywords.join('\n');
     $('ruleUrgent').value = rules.urgentKeywords.join('\n');
+    $('ruleVip').value = rules.vipSenders.join('\n');
+    $('ruleExcludeSender').value = rules.excludeSenders.join('\n');
   }
   $('useAI').checked = !!settings.useAI;
   refreshAIState();
@@ -197,7 +202,18 @@ function renderSettings() {
 
 const lines = (id) => [...new Set($(id).value.split('\n').map((s) => s.trim()).filter(Boolean))];
 $('saveRules').onclick = async () => {
-  await send({ type: 'settings:set', patch: { rules: { taskKeywords: lines('ruleTask'), excludeKeywords: lines('ruleExclude'), urgentKeywords: lines('ruleUrgent') } } });
+  await send({
+    type: 'settings:set',
+    patch: {
+      rules: {
+        taskKeywords: lines('ruleTask'),
+        excludeKeywords: lines('ruleExclude'),
+        urgentKeywords: lines('ruleUrgent'),
+        vipSenders: lines('ruleVip'),
+        excludeSenders: lines('ruleExcludeSender'),
+      },
+    },
+  });
   flash('rulesMsg', '저장했어요. 새로 읽는 메일부터 적용돼요.');
 };
 $('resetRules').onclick = async () => {
@@ -302,7 +318,7 @@ async function runAI() {
       status.textContent = `내장 AI로 다듬는 중… ${++n}/${targets.length}`;
       const patch = { aiChecked: true };
       try {
-        const r = await refineSubject(t.subject || t.title, today());
+        const r = await refineSubject(t.subject || t.title, today(), t.sender);
         const latest = (await chrome.storage.local.get('todos')).todos?.find((x) => x.id === t.id);
         if (!latest || latest.edited) continue; // 그 사이 사용자가 고쳤으면 건드리지 않음
         if (r.title) patch.title = r.title;

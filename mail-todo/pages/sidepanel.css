@@ -133,6 +133,7 @@ button.icon:hover { background: var(--hover-bg); color: var(--text); }
 .sp-item .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 3px; font-size: 11px; color: var(--muted); }
 .sp-item .meta .due.overdue { color: var(--high); font-weight: 600; }
 .sp-item .meta .mb-tag { font-size: 11px; }
+.sp-item .meta .sender { color: var(--text); opacity: .8; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-item .meta a { color: var(--muted); }
 .sp-item .memo { font-size: 11px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
