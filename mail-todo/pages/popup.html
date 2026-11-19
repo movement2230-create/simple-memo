@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>메일 할 일</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>메일 할 일</h1>
+    <button id="openDash" class="primary">달력 열기</button>
+  </header>
+
+  <section class="site">
+    <div class="site-line">
+      <span id="siteName" class="site-name"></span>
+      <span id="siteState" class="site-state"></span>
+    </div>
+    <p id="siteHelp" class="muted"></p>
+    <div class="row">
+      <button id="toggleSite"></button>
+      <button id="scanBtn" hidden>지금 읽기</button>
+      <button id="pickBtn" hidden>목록 직접 지정</button>
+    </div>
+    <p id="msg" class="msg" role="status"></p>
+  </section>
+
+  <section>
+    <h2>오늘까지 할 일 <span id="dueCount" class="muted"></span></h2>
+    <ul id="dueList" class="due-list"></ul>
+  </section>
+
+  <footer class="muted">메일 제목만 읽고, 모든 처리는 이 PC 안에서만 해요.</footer>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

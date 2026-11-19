@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메일 할 일 · 달력</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <header class="top">
+    <h1>메일 할 일</h1>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="calendar" aria-selected="true">달력</button>
+      <button role="tab" data-tab="list" aria-selected="false">목록</button>
+      <button role="tab" data-tab="settings" aria-selected="false">설정</button>
+    </nav>
+    <span id="aiStatus" class="ai-status" hidden></span>
+    <button id="addBtn" class="primary">+ 할 일 추가</button>
+  </header>
+
+  <main>
+    <!-- 달력 -->
+    <section id="tab-calendar" class="tab">
+      <div class="cal-layout">
+        <div class="cal-main">
+          <div class="cal-nav">
+            <button id="prevMonth" aria-label="이전 달">‹</button>
+            <h2 id="monthLabel"></h2>
+            <button id="nextMonth" aria-label="다음 달">›</button>
+            <button id="todayBtn">오늘</button>
+            <label class="check"><input type="checkbox" id="showDone"> 완료한 일 보기</label>
+          </div>
+          <div class="cal-head">
+            <div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+        <aside class="cal-side">
+          <h3>마감일 없음 <span id="noDueCount" class="muted"></span></h3>
+          <p class="muted hint">끌어서 달력 날짜에 놓으면 마감일이 정해져요. 달력의 할 일을 여기로 끌어오면 마감일이 지워져요.</p>
+          <ul id="noDueList" class="side-list drop-zone" data-date=""></ul>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 목록 -->
+    <section id="tab-list" class="tab" hidden>
+      <div class="list-tools">
+        <select id="listFilter" aria-label="보기">
+          <option value="open">할 일</option>
+          <option value="done">완료</option>
+          <option value="all">전체</option>
+        </select>
+        <input type="search" id="listSearch" placeholder="검색 (제목, 메모, 원래 메일 제목)">
+        <span id="listCount" class="muted"></span>
+      </div>
+      <div id="listBody"></div>
+    </section>
+
+    <!-- 설정 -->
+    <section id="tab-settings" class="tab" hidden>
+      <div class="settings">
+        <article class="card">
+          <h3>할 일을 수집하는 메일함</h3>
+          <p class="muted">메일함 페이지에서 툴바의 확장 프로그램 아이콘을 누르고 <b>이 메일함에서 켜기</b>를 누르면 여기에 추가돼요.</p>
+          <ul id="siteList" class="site-list"></ul>
+        </article>
+
+        <article class="card">
+          <h3>할 일 판단 규칙</h3>
+          <p class="muted">한 줄에 하나씩 적어 주세요. 띄어쓰기는 무시하고 비교해요. 이미 읽은 메일에는 바뀐 규칙이 적용되지 않아요(아래 <b>처리 기록 초기화</b>로 다시 읽을 수 있어요).</p>
+          <div class="rules">
+            <label>할 일로 볼 단어<textarea id="ruleTask" rows="10"></textarea></label>
+            <label>제외할 단어 (마감일이 있어도 제외)<textarea id="ruleExclude" rows="10"></textarea></label>
+            <label>우선순위 '높음' 단어<textarea id="ruleUrgent" rows="10"></textarea></label>
+          </div>
+          <div class="row">
+            <button id="saveRules" class="primary">규칙 저장</button>
+            <button id="resetRules">기본값으로</button>
+            <span id="rulesMsg" class="muted"></span>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>브라우저 내장 AI</h3>
+          <p class="muted">Chrome(Gemini Nano)이나 Edge(Phi-4-mini 등)에 들어 있는 AI가 이 PC 안에서만 할 일 문장과 마감일을 다듬어요. 메일 제목은 외부로 나가지 않아요. 내장 AI가 없으면 규칙만으로 동작해요.</p>
+          <label class="check"><input type="checkbox" id="useAI"> 내장 AI로 다듬기</label>
+          <p>상태: <span id="aiState">확인 중…</span></p>
+          <div class="row">
+            <button id="aiPrepare" hidden>AI 모델 준비하기</button>
+            <button id="aiRunNow" hidden>지금 다듬기</button>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>데이터</h3>
+          <p class="muted">할 일은 이 브라우저 안에만 저장돼요.</p>
+          <div class="row wrap">
+            <button id="exportBtn">백업 파일로 내보내기</button>
+            <label class="file-btn"><input type="file" id="importFile" accept="application/json,.json" hidden><span>백업에서 가져오기</span></label>
+            <button id="clearSeen">처리 기록 초기화 (메일 다시 읽기)</button>
+            <button id="clearAll" class="danger">모든 할 일 삭제</button>
+          </div>
+          <p id="dataMsg" class="muted"></p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <!-- 할 일 편집 -->
+  <dialog id="editDlg">
+    <form id="editForm" method="dialog">
+      <h2 id="editTitle">할 일 수정</h2>
+      <label>할 일<input type="text" id="fTitle" required maxlength="200"></label>
+      <div class="row">
+        <label>마감일<input type="date" id="fDue"></label>
+        <label>시간<input type="time" id="fTime"></label>
+        <label>우선순위
+          <select id="fPriority">
+            <option value="high">높음</option>
+            <option value="normal">보통</option>
+            <option value="low">낮음</option>
+          </select>
+        </label>
+      </div>
+      <label>메모<textarea id="fMemo" rows="4" maxlength="5000"></textarea></label>
+      <label class="check"><input type="checkbox" id="fDone"> 완료</label>
+      <div id="fOrigin" class="origin" hidden>
+        <div class="muted">원래 메일 제목</div>
+        <div id="fSubject"></div>
+        <a id="fLink" target="_blank" rel="noopener" hidden>메일 열기 ↗</a>
+      </div>
+      <div class="dlg-actions">
+        <button type="button" id="fDelete" class="danger">삭제</button>
+        <span class="spacer"></span>
+        <button type="button" id="fCancel">취소</button>
+        <button type="submit" class="primary">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

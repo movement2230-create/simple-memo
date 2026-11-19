@@ -37,6 +37,7 @@
 | `scripts/package.py` | 스토어 업로드용 ZIP 생성 |
 | `scripts/chrome-test.mjs` | 실제 Chrome에 확장 프로그램을 올려 기능 점검 |
 | `CHROMEWEBSTORE.md` | 스토어 등록 정보, 권한 사유, 버전 기록 |
+| `mail-todo/` | 별도 확장 프로그램: 메일 제목으로 할 일·달력 만들기 ([설명](mail-todo/README.md)) |
 
 ## 테스트
 

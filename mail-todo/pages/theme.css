@@ -1,0 +1,101 @@
+/* 팝업과 달력 화면이 함께 쓰는 색·기본 스타일 (간단 메모장과 같은 톤) */
+:root {
+  --bg: #ffffff;
+  --panel: #f6f6f4;
+  --border: #e3e3df;
+  --text: #1f1f1d;
+  --muted: #7a7a74;
+  --accent: #e0a526;
+  --accent-text: #1f1f1d;
+  --active-bg: #fff4d6;
+  --hover-bg: #ececea;
+  --danger: #c0392b;
+  --danger-bg: #fdecea;
+  --ok: #2e7d4f;
+  --high: #d93025;
+  --high-bg: #fde7e5;
+  --normal: #b27b00;
+  --normal-bg: #fff4d6;
+  --low: #5f6b7a;
+  --low-bg: #eceff3;
+  --today-bg: #fff8e6;
+  --sun: #c0392b;
+  --sat: #2b6cb0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1d;
+    --panel: #252524;
+    --border: #3a3a38;
+    --text: #ececea;
+    --muted: #9a9a94;
+    --accent: #e0a526;
+    --accent-text: #1f1f1d;
+    --active-bg: #3a3222;
+    --hover-bg: #30302e;
+    --danger: #ff7b6b;
+    --danger-bg: #3d2522;
+    --ok: #6fcf97;
+    --high: #ff8a80;
+    --high-bg: #45221f;
+    --normal: #f0c060;
+    --normal-bg: #3a3222;
+    --low: #a7b0bd;
+    --low-bg: #2c3036;
+    --today-bg: #332c1c;
+    --sun: #ff8a80;
+    --sat: #8ab4f8;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  font-family: system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+button {
+  cursor: pointer;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+button:hover { background: var(--hover-bg); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+button.primary:hover { filter: brightness(1.05); }
+button.danger { color: var(--danger); }
+button.danger:hover { background: var(--danger-bg); }
+button.link { border: 0; background: none; padding: 2px 4px; color: var(--muted); }
+button.link:hover { color: var(--text); background: var(--hover-bg); }
+
+input[type="text"], input[type="date"], input[type="time"], input[type="search"], select, textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.badge.p-high { color: var(--high); background: var(--high-bg); }
+.badge.p-normal { color: var(--normal); background: var(--normal-bg); }
+.badge.p-low { color: var(--low); background: var(--low-bg); }
+
+.muted { color: var(--muted); }
+.empty { color: var(--muted); padding: 12px 0; text-align: center; }
