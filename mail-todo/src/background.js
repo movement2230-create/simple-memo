@@ -173,3 +173,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 chrome.runtime.onStartup.addListener(updateBadge);
 chrome.runtime.onInstalled.addListener(updateBadge);
+
+// ---------- 툴바 아이콘 → 사이드 패널 ----------
+// Chrome·Edge 모두 아이콘을 누르면 오른쪽 사이드 패널이 열립니다.
+// 사이드 패널을 지원하지 않는 브라우저에서는 큰 화면을 새 탭으로 엽니다.
+if (chrome.sidePanel?.setPanelBehavior) {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+} else {
+  chrome.action.onClicked.addListener(() => chrome.tabs.create({ url: chrome.runtime.getURL('pages/dashboard.html') }));
+}

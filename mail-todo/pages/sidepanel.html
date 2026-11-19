@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메일 할 일</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body class="panel">
+  <header class="sp-top">
+    <h1>메일 할 일</h1>
+    <span class="spacer"></span>
+    <button id="addBtn" class="primary sm">+ 추가</button>
+    <button id="expandBtn" class="icon" title="큰 화면으로 보기" aria-label="큰 화면으로 보기">⤢</button>
+    <button id="settingsBtn" class="icon" title="설정" aria-label="설정">⚙</button>
+  </header>
+
+  <!-- 지금 보고 있는 탭의 메일함 -->
+  <section class="sp-site" id="site">
+    <div class="site-line">
+      <span id="siteDot" class="mb-dot" hidden></span>
+      <span id="siteName" class="site-name"></span>
+      <span id="siteState" class="site-state" hidden></span>
+    </div>
+    <p id="siteHelp" class="muted"></p>
+    <div class="row" id="siteActions">
+      <button id="toggleSite" hidden></button>
+      <button id="scanBtn" hidden>지금 읽기</button>
+      <button id="pickBtn" hidden>목록 직접 지정</button>
+    </div>
+    <label id="mbNameRow" class="mb-name-row" hidden>이 메일함 이름
+      <input type="text" id="mbName" maxlength="20" placeholder="예: 사내, 구글, 네이버">
+    </label>
+    <p id="msg" class="msg" role="status"></p>
+  </section>
+
+  <div id="mbBar" class="mb-bar" role="group" aria-label="메일함 골라 보기"></div>
+
+  <!-- 달력 -->
+  <section class="mini-cal" aria-label="달력">
+    <div class="mc-nav">
+      <button id="prevMonth" class="icon" aria-label="이전 달">‹</button>
+      <h2 id="monthLabel"></h2>
+      <button id="nextMonth" class="icon" aria-label="다음 달">›</button>
+      <button id="todayBtn" class="sm">오늘</button>
+    </div>
+    <div class="mc-head">
+      <div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div>
+    </div>
+    <div class="mc-grid" id="calGrid"></div>
+    <p class="muted hint">날짜를 누르면 그날 할 일만 보여요. 목록의 할 일을 날짜로 끌어 놓으면 마감일이 바뀌어요.</p>
+  </section>
+
+  <!-- 목록 -->
+  <section class="sp-list">
+    <div class="sp-list-head">
+      <h2 id="listTitle">할 일</h2>
+      <button id="clearDay" class="link" hidden>전체 보기</button>
+      <span class="spacer"></span>
+      <label class="check"><input type="checkbox" id="showDone"> 완료 포함</label>
+    </div>
+    <input type="search" id="listSearch" placeholder="검색">
+    <div id="listBody"></div>
+  </section>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

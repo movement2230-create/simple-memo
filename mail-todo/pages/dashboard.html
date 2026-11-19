@@ -111,41 +111,6 @@
     </section>
   </main>
 
-  <!-- 할 일 편집 -->
-  <dialog id="editDlg">
-    <form id="editForm" method="dialog">
-      <h2 id="editTitle">할 일 수정</h2>
-      <label>할 일<input type="text" id="fTitle" required maxlength="200"></label>
-      <div class="row">
-        <label>마감일<input type="date" id="fDue"></label>
-        <label>시간<input type="time" id="fTime"></label>
-        <label>우선순위
-          <select id="fPriority">
-            <option value="high">높음</option>
-            <option value="normal">보통</option>
-            <option value="low">낮음</option>
-          </select>
-        </label>
-        <label>메일함
-          <select id="fMailbox"></select>
-        </label>
-      </div>
-      <label>메모<textarea id="fMemo" rows="4" maxlength="5000"></textarea></label>
-      <label class="check"><input type="checkbox" id="fDone"> 완료</label>
-      <div id="fOrigin" class="origin" hidden>
-        <div class="muted">원래 메일 제목</div>
-        <div id="fSubject"></div>
-        <a id="fLink" target="_blank" rel="noopener" hidden>메일 열기 ↗</a>
-      </div>
-      <div class="dlg-actions">
-        <button type="button" id="fDelete" class="danger">삭제</button>
-        <span class="spacer"></span>
-        <button type="button" id="fCancel">취소</button>
-        <button type="submit" class="primary">저장</button>
-      </div>
-    </form>
-  </dialog>
-
   <script type="module" src="dashboard.js"></script>
 </body>
 </html>

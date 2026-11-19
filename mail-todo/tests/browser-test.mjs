@@ -274,12 +274,66 @@ await bg({ type: 'subjects', site: 'test', items: [{ subject: '출장 품의서 
 todos = (await getTodos()).filter((t) => t.site === 'test');
 check('규칙: 사용자가 바꾼 단어로 판단', todos.length === 1 && todos[0].title.includes('품의서'), todos.map((t) => t.title).join(' | '));
 
-const popup = await ctx.newPage();
-await popup.setViewportSize({ width: 360, height: 520 });
-await popup.goto(extUrl('pages/popup.html'));
-await popup.waitForSelector('#dueList li');
-await popup.screenshot({ path: path.join(OUT, '6-popup.png') });
-check('팝업: 오늘까지 할 일 표시', (await popup.locator('#dueList li:not(.empty)').count()) > 0);
+// 6) 사이드 패널: 위 달력, 아래 목록
+const behavior = await sw.evaluate(() => chrome.sidePanel.getPanelBehavior());
+check('사이드 패널: 툴바 아이콘을 누르면 패널이 열리도록 설정', behavior.openPanelOnActionClick === true);
+const panel = await ctx.newPage();
+panel.on('pageerror', (e) => errors.push(`sidepanel: ${e.message}`));
+await panel.setViewportSize({ width: 400, height: 900 });
+await panel.goto(extUrl('pages/sidepanel.html'));
+await panel.waitForSelector('.mc-day');
+await panel.waitForSelector('.sp-item');
+const calBox = await panel.locator('.mini-cal').boundingBox();
+const listBox = await panel.locator('.sp-list').boundingBox();
+check('사이드 패널: 달력이 위, 목록이 아래', calBox.y < listBox.y, `달력 y=${Math.round(calBox.y)}, 목록 y=${Math.round(listBox.y)}`);
+check('사이드 패널: 가로 스크롤 없음', await panel.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+const openShown = (await getTodos()).filter((t) => !t.done).length;
+check('사이드 패널: 끝내지 않은 할 일이 목록에 모두 표시', (await panel.locator('.sp-item').count()) === openShown, `${await panel.locator('.sp-item').count()}/${openShown}`);
+const dotsOn28 = await panel.locator(`.mc-day[data-date="${target}"] .mb-dot`).count();
+check('사이드 패널: 할 일 있는 날짜에 메일함 색 점', dotsOn28 > 0, `${target}: ${dotsOn28}개`);
+await panel.screenshot({ path: path.join(OUT, '6-sidepanel.png') });
+
+// 날짜를 누르면 그날 할 일만
+await panel.click(`.mc-day[data-date="${target}"]`);
+const onTarget = (await getTodos()).filter((t) => !t.done && t.due === target).length;
+check('사이드 패널: 날짜를 누르면 그날 할 일만', await waitFor(async () => (await panel.locator('.sp-item').count()) === onTarget, 3000), `${onTarget}개, 제목 "${await panel.textContent('#listTitle')}"`);
+await panel.screenshot({ path: path.join(OUT, '6-sidepanel-day.png') });
+await panel.click('#clearDay');
+check('사이드 패널: 전체 보기로 돌아가기', await waitFor(async () => (await panel.locator('.sp-item').count()) === openShown, 3000));
+
+// 목록에서 달력 날짜로 끌어 놓기
+const dragT = (await getTodos()).find((t) => !t.done && !t.due);
+const day3 = `${target.slice(0, 8)}03`;
+await panel.locator(`.sp-item[data-id="${dragT.id}"]`).dragTo(panel.locator(`.mc-day[data-date="${day3}"]`));
+check('사이드 패널: 목록의 할 일을 달력 날짜로 끌면 마감일 변경', await waitFor(async () => (await getTodos()).find((t) => t.id === dragT.id)?.due === day3, 3000), dragT.title);
+
+// 패널에서 수정
+const pEdit = (await getTodos()).find((t) => !t.done && t.site === 'mail.naver.com' && t.due);
+await panel.click(`.sp-item[data-id="${pEdit.id}"] .title`);
+await panel.fill('#fTitle', '정산 서류 제출');
+await panel.click('#editForm button[type="submit"]');
+check('사이드 패널: 할 일 수정', await waitFor(async () => (await getTodos()).find((t) => t.id === pEdit.id)?.title === '정산 서류 제출', 3000));
+
+// 패널에서 완료
+await panel.click(`.sp-item[data-id="${pEdit.id}"] .chk`);
+check('사이드 패널: 완료 체크', await waitFor(async () => (await getTodos()).find((t) => t.id === pEdit.id)?.done, 3000));
+
+// 메일함 탭으로 옮기면 패널 위쪽에 그 메일함이 보임
+check('사이드 패널: 메일함 탭이 아닐 때 안내', (await panel.textContent('#siteName')).includes('메일함 탭이 아니에요'));
+await gw.bringToFront();
+check('사이드 패널: 사내 메일 탭으로 옮기면 그 메일함 표시', await waitFor(async () => (await panel.textContent('#siteName')) === '우리회사' && (await panel.textContent('#siteState')) === '수집 중', 4000), await panel.textContent('#siteName'));
+await gm.bringToFront();
+check('사이드 패널: 구글 탭으로 옮기면 바뀜', await waitFor(async () => (await panel.textContent('#siteName')) === '구글', 4000), await panel.textContent('#siteName'));
+
+// 끄기 → 켜기
+await wm.bringToFront();
+await waitFor(async () => (await panel.textContent('#siteHelp')).includes('localhost'), 4000);
+await panel.click('#toggleSite');
+check('사이드 패널: 끄기', await waitFor(async () => !(await dash.evaluate(async () => (await chrome.storage.local.get('sites')).sites)).includes('localhost'), 3000));
+await waitFor(async () => (await panel.textContent('#toggleSite')).includes('켜기'), 3000);
+await panel.click('#toggleSite');
+check('사이드 패널: 다시 켜기', await waitFor(async () => (await dash.evaluate(async () => (await chrome.storage.local.get('sites')).sites)).includes('localhost'), 3000));
+await panel.screenshot({ path: path.join(OUT, '6-sidepanel-site.png') });
 
 const badge = await sw.evaluate(() => chrome.action.getBadgeText({}));
 check('배지: 오늘까지 할 일 수 표시', /^\d+$/.test(badge), badge);

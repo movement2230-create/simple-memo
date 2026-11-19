@@ -4,11 +4,22 @@
   "version": "0.2.0",
   "description": "메일 목록의 제목만 읽어 할 일과 마감일을 자동으로 만들고 달력에 보여 줍니다. 모든 처리는 이 PC 안에서만 이뤄집니다.",
   "minimum_chrome_version": "120",
-  "permissions": ["storage", "activeTab", "scripting"],
-  "optional_host_permissions": ["*://*/*"],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "sidePanel",
+    "tabs"
+  ],
+  "optional_host_permissions": [
+    "*://*/*"
+  ],
   "background": {
     "service_worker": "src/background.js",
     "type": "module"
+  },
+  "side_panel": {
+    "default_path": "pages/sidepanel.html"
   },
   "icons": {
     "16": "icons/icon-16.png",
@@ -17,8 +28,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_popup": "pages/popup.html",
-    "default_title": "메일 할 일",
+    "default_title": "메일 할 일 열기",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

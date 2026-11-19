@@ -1,71 +1,21 @@
-// 달력·목록·설정 화면
-import { DEFAULT_RULES, addDays, mergeRules, parseYmd, sitePattern, ymd } from '../src/rules.js';
+// 큰 화면: 달력·목록·설정 (사이드 패널의 "크게 보기")
+import { DEFAULT_RULES, addDays, mergeRules, sitePattern, ymd } from '../src/rules.js';
 import { aiAvailability, prepareModel, refineSubject } from '../src/ai.js';
-import { listMailboxes, mailboxOf } from '../src/mailboxes.js';
-
-const $ = (id) => document.getElementById(id);
-const send = (msg) => chrome.runtime.sendMessage(msg);
-const PRIORITY_LABEL = { high: '높음', normal: '보통', low: '낮음' };
-const PRIORITY_ORDER = { high: 0, normal: 1, low: 2 };
+import { mailboxOf } from '../src/mailboxes.js';
+import {
+  $, send, h, state, load as loadState, update, toggleDone, today, isOverdue, sortTodos, formatDue, groupTodos,
+  PRIORITY_LABEL, mb, shown, dot, renderMailboxBar, onHiddenChange, draggable, makeDropZone, openEdit,
+} from './common.js';
 
 let todos = [];
 let settings = {};
 let sites = [];
 let view = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-// 숨긴 메일함(이 브라우저에서만 기억하는 보기 설정)
-const hidden = new Set((() => { try { return JSON.parse(localStorage.getItem('hiddenMailboxes') || '[]'); } catch { return []; } })());
-const saveHidden = () => { try { localStorage.setItem('hiddenMailboxes', JSON.stringify([...hidden])); } catch { /* 저장 못 해도 동작 */ } };
-const mb = (t) => mailboxOf(t.site, settings.mailboxes);
-const shown = (t) => !hidden.has(t.site || '');
-const dot = (m) => h('span', { class: 'mb-dot', style: `background:${m.color}`, 'aria-hidden': 'true' });
-
-// 사용자 데이터(메일 제목 등)는 항상 textContent로만 넣습니다.
-function h(tag, props = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (v == null || v === false) continue;
-    if (k === 'class') el.className = v;
-    else if (k === 'dataset') Object.assign(el.dataset, v);
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
-    else if (k === 'text') el.textContent = v;
-    else el.setAttribute(k, v === true ? '' : v);
-  }
-  for (const c of children.flat()) if (c != null && c !== false) el.append(c);
-  return el;
-}
-
-const today = () => ymd(new Date());
-const isOverdue = (t) => !t.done && t.due && t.due < today();
-
-function sortTodos(list) {
-  return [...list].sort((a, b) =>
-    (a.done - b.done)
-    || (a.due || '9999').localeCompare(b.due || '9999')
-    || (a.dueTime || '99').localeCompare(b.dueTime || '99')
-    || PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
-    || a.createdAt.localeCompare(b.createdAt));
-}
-
-function formatDue(t) {
-  if (!t.due) return '마감일 없음';
-  const d = parseYmd(t.due);
-  const diff = Math.round((d - parseYmd(today())) / 86400000);
-  const rel = diff === 0 ? '오늘' : diff === 1 ? '내일' : diff === -1 ? '어제' : diff < 0 ? `${-diff}일 지남` : `${diff}일 남음`;
-  const wd = '일월화수목금토'[d.getDay()];
-  return `${d.getMonth() + 1}/${d.getDate()}(${wd})${t.dueTime ? ' ' + t.dueTime : ''} · ${rel}`;
-}
-
-// ---------- 데이터 ----------
 async function load() {
-  const d = await chrome.storage.local.get(['todos', 'settings', 'sites']);
-  todos = d.todos || [];
-  settings = d.settings || {};
-  sites = d.sites || [];
+  await loadState();
+  ({ todos, settings, sites } = state);
 }
-
-const update = (id, patch) => send({ type: 'todo:update', id, patch });
-const toggleDone = (t) => update(t.id, { done: !t.done });
 
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== 'local') return;
@@ -73,6 +23,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   render();
   if (changes.todos) scheduleAI();
 });
+onHiddenChange(() => render());
 
 // ---------- 탭 ----------
 function showTab(name) {
@@ -87,40 +38,19 @@ const currentTab = () => document.querySelector('.tabs button[aria-selected="tru
 function render() {
   const tab = currentTab();
   $('mbBar').hidden = tab === 'settings';
-  if (tab !== 'settings') renderMailboxBar();
+  if (tab !== 'settings') renderMailboxBar($('mbBar'), render);
   if (tab === 'calendar') renderCalendar();
   else if (tab === 'list') renderList();
   else renderSettings();
 }
 
-// ---------- 메일함 골라 보기 ----------
-function renderMailboxBar() {
-  const boxes = listMailboxes(sites, todos, settings.mailboxes);
-  const bar = $('mbBar');
-  if (boxes.length < 2) { bar.replaceChildren(); bar.hidden = true; return; }
-  const count = (key) => todos.filter((t) => !t.done && (t.site || '') === key).length;
-  bar.replaceChildren(
-    h('span', { class: 'mb-label', text: '메일함' }),
-    ...boxes.map((m) => h('button', {
-      class: 'mb-toggle',
-      'aria-pressed': String(!hidden.has(m.key)),
-      title: m.key ? `${m.name} (${m.key})` : m.name,
-      onclick: () => { hidden.has(m.key) ? hidden.delete(m.key) : hidden.add(m.key); saveHidden(); render(); },
-    }, dot(m), h('span', { text: m.name }), h('span', { class: 'mb-count', text: String(count(m.key)) }))),
-    ...(hidden.size ? [h('button', { class: 'link', text: '모두 보기', onclick: () => { hidden.clear(); saveHidden(); render(); } })] : []),
-  );
-}
-
 // ---------- 할 일 조각(달력·사이드 공용) ----------
 function chip(t) {
-  const el = h('div', {
+  return draggable(h('div', {
     class: `chip p-${t.priority}${t.done ? ' done' : ''}${isOverdue(t) ? ' overdue' : ''}`,
-    draggable: 'true',
     title: [t.title, `메일함: ${mb(t).name}`, t.dueTime && `시간: ${t.dueTime}`, t.memo && `메모: ${t.memo}`, t.subject && t.subject !== t.title && `메일: ${t.subject}`].filter(Boolean).join('\n'),
     dataset: { id: t.id },
     onclick: () => openEdit(t.id),
-    ondragstart: (e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); },
-    ondragend: () => el.classList.remove('dragging'),
   },
   h('button', {
     class: `chk${t.done ? ' on' : ''}`,
@@ -131,20 +61,7 @@ function chip(t) {
   dot(mb(t)),
   t.dueTime && h('span', { class: 'time', text: t.dueTime }),
   h('span', { class: 't', text: t.title }),
-  t.aiDoubt && !t.done && h('span', { class: 'ai-doubt', title: '내장 AI는 할 일이 아닐 수 있다고 판단했어요', text: 'AI?' }));
-  return el;
-}
-
-function makeDropZone(el, date) {
-  el.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drag-over'); });
-  el.addEventListener('dragleave', (e) => { if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over'); });
-  el.addEventListener('drop', (e) => {
-    e.preventDefault();
-    el.classList.remove('drag-over');
-    const id = e.dataTransfer.getData('text/plain');
-    const t = todos.find((x) => x.id === id);
-    if (t && (t.due || '') !== date) update(id, { due: date || null, ...(date ? {} : { dueTime: null }), edited: true });
-  });
+  t.aiDoubt && !t.done && h('span', { class: 'ai-doubt', title: '내장 AI는 할 일이 아닐 수 있다고 판단했어요', text: 'AI?' })), t);
 }
 
 // ---------- 달력 ----------
@@ -206,25 +123,13 @@ function renderList() {
   list = sortTodos(list);
   $('listCount').textContent = `${list.length}개`;
 
-  const todayStr = today();
-  const weekEnd = ymd(addDays(new Date(), 7));
-  const groups = [
-    ['지난 마감', (t) => !t.done && t.due && t.due < todayStr, 'overdue'],
-    ['오늘', (t) => !t.done && t.due === todayStr],
-    ['7일 안', (t) => !t.done && t.due > todayStr && t.due <= weekEnd],
-    ['나중에', (t) => !t.done && t.due > weekEnd],
-    ['마감일 없음', (t) => !t.done && !t.due],
-    ['완료', (t) => t.done],
-  ];
   const body = $('listBody');
   body.replaceChildren();
   if (!list.length) {
     body.append(h('p', { class: 'empty', text: q ? '검색 결과가 없어요.' : '할 일이 없어요. 메일함 페이지에서 확장 프로그램을 켜 보세요.' }));
     return;
   }
-  for (const [name, test, cls] of groups) {
-    const items = list.filter(test);
-    if (!items.length) continue;
+  for (const { name, cls, items } of groupTodos(list)) {
     body.append(h('h3', { class: `group-title${cls ? ' ' + cls : ''}`, text: `${name} (${items.length})` }));
     for (const t of items) body.append(row(t));
   }
@@ -247,63 +152,8 @@ function row(t) {
 $('listFilter').onchange = renderList;
 $('listSearch').oninput = renderList;
 
-// ---------- 편집 창 ----------
-let editingId = null;
-const dlg = $('editDlg');
-
-function openEdit(id, date = '') {
-  const t = id ? todos.find((x) => x.id === id) : null;
-  editingId = t ? t.id : null;
-  $('editTitle').textContent = t ? '할 일 수정' : '할 일 추가';
-  $('fTitle').value = t?.title || '';
-  $('fDue').value = t ? t.due || '' : date;
-  $('fTime').value = t?.dueTime || '';
-  $('fPriority').value = t?.priority || 'normal';
-  $('fMemo').value = t?.memo || '';
-  $('fDone').checked = !!t?.done;
-  const boxes = listMailboxes(sites, todos, settings.mailboxes);
-  if (!boxes.some((m) => m.key === '')) boxes.push(mailboxOf(''));
-  $('fMailbox').replaceChildren(...boxes.map((m) => h('option', { value: m.key, text: m.key ? `${m.name} (${m.key})` : m.name })));
-  // 새로 추가할 때는 지금 하나만 보고 있는 메일함을 기본값으로
-  const onlyShown = boxes.filter((m) => !hidden.has(m.key));
-  $('fMailbox').value = t ? t.site || '' : onlyShown.length === 1 ? onlyShown[0].key : '';
-  $('fDelete').hidden = !t;
-  const fromMail = t?.source === 'mail';
-  $('fOrigin').hidden = !fromMail;
-  if (fromMail) {
-    $('fSubject').textContent = `${t.subject}${t.site ? ` (${t.site})` : ''}`;
-    $('fLink').hidden = !t.link;
-    if (t.link) $('fLink').href = t.link;
-  }
-  dlg.showModal();
-  $('fTitle').focus();
-}
-
-$('editForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const title = $('fTitle').value.trim();
-  if (!title) return;
-  const fields = {
-    title,
-    due: $('fDue').value || null,
-    dueTime: $('fDue').value ? $('fTime').value || null : null,
-    priority: $('fPriority').value,
-    memo: $('fMemo').value,
-    done: $('fDone').checked,
-    site: $('fMailbox').value,
-  };
-  if (editingId) await update(editingId, { ...fields, edited: true, aiDoubt: false });
-  else await send({ type: 'todo:add', todo: { ...fields, source: 'manual' } });
-  dlg.close();
-});
-$('fCancel').onclick = () => dlg.close();
-$('fDelete').onclick = async () => {
-  if (!editingId) return;
-  if (!confirm('이 할 일을 삭제할까요?')) return;
-  await send({ type: 'todo:delete', id: editingId });
-  dlg.close();
-};
 $('addBtn').onclick = () => openEdit(null, currentTab() === 'calendar' ? today() : '');
+
 
 // ---------- 설정 ----------
 function renderSettings() {
